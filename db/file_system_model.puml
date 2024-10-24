@@ -1,0 +1,71 @@
+@startuml laboratory
+
+entity file {
+    + file_id = serial
+    - path = varchar<255>
+    - size = int
+    - modification_time = timestamp
+    - user_id = integer
+    - group_id = integer
+}
+
+entity user {
+    + user_id = serial
+    - login = varchar<255>
+    - password = big_integer    
+    - session_id = int
+    - time_registration = timestamp
+    - root = bool
+}
+
+entity event {
+    + event_id = serial
+    - user_id = int
+    - file_id = int
+    - event_type = {'read', 'write', 'delete', 'change_permission'}
+    - event_time = timestamp
+}
+
+entity session {
+    + session_id = serial
+    - user_id = int
+    - token = varchar<255>    
+    - enter_time = timestamp
+    - exit_time = timestamp
+}
+
+entity user_to_group {
+    - user_id = int
+    - group_id = int
+}
+
+entity group {
+    + group_id = serial
+}
+
+entity permission_user {
+    + file_id = int
+    - user_id = int
+    - read_access = bool
+    - write_access = bool
+    - execution_access = bool
+}
+
+entity permission_group {
+    + file_id = int
+    - group_id = int
+    - read_access = bool
+    - write_access = bool
+    - execution_access = bool
+}
+
+user -right-{ user_to_group
+user_to_group }-down- group
+user -down-{ permission_user
+file -left- permission_user
+group -down-{ permission_group
+file -right- permission_group
+user -up- session
+user -down-{ event
+file -up- event
+@enduml
