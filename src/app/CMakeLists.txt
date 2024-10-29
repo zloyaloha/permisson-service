@@ -1,0 +1,25 @@
+cmake_minimum_required(VERSION 3.9)
+project(ClientApp)
+
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
+
+set(CMAKE_CXX_STANDARD 17)
+
+find_package(Qt5 COMPONENTS Widgets Core Gui REQUIRED)
+
+set(WINDOWS_SRC
+    main.cpp
+    hello_w.cpp
+    registration_w.cpp
+)
+
+qt5_wrap_ui(UI_HEADERS hello_w.ui)
+
+add_executable(app
+    ${WINDOWS_SRC}
+    ${UI_HEADERS}
+)
+
+target_link_libraries(app Qt5::Widgets)
