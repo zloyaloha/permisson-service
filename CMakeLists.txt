@@ -3,6 +3,6 @@ project(permission-service)
 
 set(CMAKE_CXX_STANDARD 17)
 
-include_directories(src/app/windows/include)
+include_directories(src/common)
 add_subdirectory(src/app)
 add_subdirectory(src/server)

@@ -8,9 +8,13 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_CXX_STANDARD 17)
 
 find_package(Qt5 COMPONENTS Widgets Core Gui REQUIRED)
+find_package(Boost REQUIRED COMPONENTS system)
+
+include_directories()
 
 set(WINDOWS_SRC
     main.cpp
+    command_handler.cpp
     hello_w.cpp
     registration_w.cpp
 )

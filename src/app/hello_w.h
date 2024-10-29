@@ -6,6 +6,7 @@
 #include <iostream>
 #include "ui_hello_w.h"
 #include "registration_w.h"
+#include "command_handler.h"
 
 class HelloWindow : public QMainWindow {
     Q_OBJECT
@@ -17,4 +18,5 @@ class HelloWindow : public QMainWindow {
         void LoginButtonClicked();
 private:
     Ui::HelloWindow *ui;
+    std::shared_ptr<CommandHandler> _handler;
 };

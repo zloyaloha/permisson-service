@@ -6,6 +6,7 @@
 #include <chrono>
 #include <fstream>
 #include <iomanip>
+#include <message.h>
 
 using boost::asio::ip::tcp;
 
@@ -15,21 +16,25 @@ namespace {
     const int PORT = 12345;
 }
 
-class Server : public std::enable_shared_from_this<Server>{
+class Observable {
 public:
-    Server(boost::asio::io_context& io_context);
-    void NotifyObservers(const std::string& str);
-    void AddObserver(std::shared_ptr<IServerObserver> obs);
-    void AcceptConnections();
-private:
-    tcp::acceptor _acceptor;
-private:
+    virtual void NotifyObservers(const std::string& str);
+    virtual void AddObserver(std::shared_ptr<IServerObserver> obs);
+protected:
     std::vector<std::shared_ptr<IServerObserver>> _observers;
 };
 
-class Session : public std::enable_shared_from_this<Session> {
+class Server : public std::enable_shared_from_this<Server>, public Observable {
 public:
-    explicit Session(tcp::socket socket, std::shared_ptr<Server> server);
+    Server(boost::asio::io_context& io_context);
+    void AcceptConnections();
+private:
+    tcp::acceptor _acceptor;
+};
+
+class Session : public std::enable_shared_from_this<Session>, public Observable {
+public:
+    explicit Session(tcp::socket socket, std::vector<std::shared_ptr<IServerObserver>>& obs);
 
     void Start() {
         ReadMessage();
@@ -38,9 +43,8 @@ public:
 private:
     void ReadMessage();
 
-    tcp::socket socket_;
-    std::shared_ptr<Server> _server;
-    std::array<char, 128> _data;
+    tcp::socket _socket;
+    std::array<char, BUFFER_SIZE> _data;
 };
 
 class IServerObserver {

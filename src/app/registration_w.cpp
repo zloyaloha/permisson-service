@@ -6,7 +6,6 @@ RegistrationDialog::RegistrationDialog(QWidget *parent) : QDialog(parent)
 {
     setWindowTitle("Регистрация");
 
-    // Пример простого интерфейса для регистрации
     QLabel *label = new QLabel("Окно регистрации", this);
 
     QVBoxLayout *layout = new QVBoxLayout();
