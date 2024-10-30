@@ -19,12 +19,7 @@ Server::Server(boost::asio::io_context& io_context)
     : _acceptor(io_context, tcp::endpoint(tcp::v4(), PORT)), _threadPool(NUMBER_OF_THREADS) {}
 
 Session::Session(std::shared_ptr<tcp::socket> socket, std::vector<std::shared_ptr<IServerObserver>>& observers, ThreadPool& threadPool) 
-    : _socket(std::move(socket)), _threadPool(threadPool), _worker(std::make_shared<Worker>(threadPool, _socket, _observers)) 
-{
-    for (auto obs: observers) {
-        AddObserver(obs);
-    }
-}
+    : _socket(std::move(socket)), _threadPool(threadPool), _worker(std::make_shared<Worker>(threadPool, _socket, _observers)), Observable(observers) {}
 
 void Session::Start() {
     _data.resize(BUFFER_SIZE);
@@ -37,7 +32,7 @@ void Session::ReadMessage() {
         [this, self](boost::system::error_code ec, std::size_t length) {
             if (!ec) {
                 NotifyObservers("Сообщение получено");
-                _worker->ProccessOperation();
+                _threadPool.EnqueueTask([this] { _worker->ProccessOperation(); });
                 ReadMessage();
             } else {
                 NotifyObservers("Ошибка при получении сообщения " + ec.message());
