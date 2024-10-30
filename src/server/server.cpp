@@ -6,37 +6,68 @@ void Server::AcceptConnections() {
         [this](boost::system::error_code ec, tcp::socket socket) {
             if (!ec) {
                 NotifyObservers("Client connected!");
-                std::make_shared<Session>(std::move(socket), _observers)->Start();
+                auto socketPtr = std::make_shared<tcp::socket>(std::move(socket)); 
+                std::make_shared<Session>(socketPtr, _observers, _threadPool)->Start();
             } else {
                 NotifyObservers("ERROR while connecting" + ec.message());
             }
-            AcceptConnections();  // Принять следующее подключение
+            AcceptConnections();
         });
 }
 
 Server::Server(boost::asio::io_context& io_context)
-    : _acceptor(io_context, tcp::endpoint(tcp::v4(), PORT)) {}
+    : _acceptor(io_context, tcp::endpoint(tcp::v4(), PORT)), _threadPool(NUMBER_OF_THREADS) {}
 
-Session::Session(tcp::socket socket, std::vector<std::shared_ptr<IServerObserver>>& observers) 
-    : _socket(std::move(socket)) 
+Session::Session(std::shared_ptr<tcp::socket> socket, std::vector<std::shared_ptr<IServerObserver>>& observers, ThreadPool& threadPool) 
+    : _socket(std::move(socket)), _threadPool(threadPool), _worker(std::make_shared<Worker>(threadPool, _socket, _observers)) 
 {
     for (auto obs: observers) {
         AddObserver(obs);
     }
 }
 
+void Session::Start() {
+    _data.resize(BUFFER_SIZE);
+    ReadMessage();
+}
+
 void Session::ReadMessage() {
     auto self(shared_from_this());
-    _socket.async_read_some(boost::asio::buffer(_data),
+    _socket->async_read_some(boost::asio::buffer(_data),
         [this, self](boost::system::error_code ec, std::size_t length) {
             if (!ec) {
                 NotifyObservers("Сообщение получено");
+                _worker->ProccessOperation();
                 ReadMessage();
             } else {
                 NotifyObservers("Ошибка при получении сообщения " + ec.message());
+                boost::system::error_code ignored_ec;
+                _socket->close(ignored_ec);
+                NotifyObservers("Соединение закрыто");
             }
         });
 }
+
+Worker::Worker(ThreadPool& threadPool, std::shared_ptr<tcp::socket> socket, std::vector<std::shared_ptr<IServerObserver>>& observers) 
+    : _threadPool(threadPool), _socket(socket), Observable(observers) {}
+
+void Worker::SendResponse(const std::string& response) {
+    auto self(shared_from_this());
+    boost::asio::async_write(*_socket, boost::asio::buffer(response + '\0'),
+        [this, self](boost::system::error_code ec, std::size_t) {
+            if (ec) {
+                NotifyObservers("Ошибка при отправке ответа " + ec.message());
+                _socket->close();
+            } else {
+                NotifyObservers("Ответ отправлен");
+            }
+        });
+}
+
+void Worker::ProccessOperation() {
+    SendResponse("abracadabra123");
+}
+
 
 void Observable::NotifyObservers(const std::string& event) {
     auto now = std::chrono::system_clock::now();

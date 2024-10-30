@@ -8,7 +8,8 @@ namespace {
 }
 
 enum Operation {
-    Login
+    Login,
+    GetSalt,
 };
 
 class BaseCommand {
@@ -22,7 +23,7 @@ public:
 
     std::string toPacket() {
         std::ostringstream oss;
-        oss << int(_op) << '\n' << _pid << '\n' << _msg_data << '\n';
+        oss << int(_op) << '\n' << _pid << '\n' << _msg_data << '\0';
         return oss.str();
     }
 };
