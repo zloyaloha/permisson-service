@@ -16,6 +16,7 @@ class IServerObserver;
 namespace {
     const int PORT = 12345;
     const int NUMBER_OF_THREADS = 4;
+    // const std::string DB_URL = 
 }
 
 class Observable {
@@ -41,7 +42,7 @@ class Worker : public std::enable_shared_from_this<Worker>, public Observable {
     public:
         Worker(ThreadPool& threadPool, std::shared_ptr<tcp::socket> socket, std::vector<std::shared_ptr<IServerObserver>>& observers);
         void SendResponse(const std::string& response);
-        void ProccessOperation();
+        void ProccessOperation(const std::string& message);
     private:
         ThreadPool& _threadPool;
         std::shared_ptr<tcp::socket> _socket;
@@ -55,7 +56,7 @@ private:
     void ReadMessage();
     
     std::shared_ptr<tcp::socket> _socket;
-    std::string _data;
+    boost::asio::streambuf _buffer;
     ThreadPool& _threadPool;
     std::shared_ptr<Worker> _worker;
 };

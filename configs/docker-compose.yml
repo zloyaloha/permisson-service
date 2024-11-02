@@ -7,7 +7,6 @@ services:
       POSTGRES_USER: "zloyaloha"
       POSTGRES_PASSWORD: "1234"
     volumes:
-      - ./db/:/docker-entrypoint-initdb.d
       - habrdb-data:/var/lib/postgresql/data
     ports:
       - "5432:5432"

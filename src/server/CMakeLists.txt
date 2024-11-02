@@ -4,7 +4,11 @@ project(Server)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 find_package(Boost REQUIRED COMPONENTS system thread)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(PQXX REQUIRED libpqxx)
+pkg_check_modules(PQ REQUIRED libpq)
 include_directories(${Boost_INCLUDE_DIRS})
+include_directories(${PQXX_INCLUDE_DIRS} ${PQ_INCLUDE_DIRS})
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -18,4 +22,4 @@ add_executable(server
     ${SERVER_SRC}
 )
 
-target_link_libraries(server ${Boost_LIBRARIES})
+target_link_libraries(server ${Boost_LIBRARIES} ${PQXX_LIBRARIES} ${PQ_LIBRARIES})

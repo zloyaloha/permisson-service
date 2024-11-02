@@ -13,13 +13,25 @@ enum Operation {
 };
 
 class BaseCommand {
-private:
+public:
     Operation _op;
     int32_t _pid;
     std::string _msg_data;
-public:
     BaseCommand(Operation op, int32_t pid, const std::string& msg_data) : 
         _op(op), _pid(pid), _msg_data(msg_data) {}
+
+    BaseCommand(const std::string& msg) 
+    {
+        std::istringstream stream(msg);
+        std::string line;
+        std::getline(stream, line);
+        _op = Operation(std::stoi(line));
+        std::getline(stream, line);
+        _pid = std::stoi(line);
+        while (std::getline(stream, line)) {
+            _msg_data += line;
+        }
+    }
 
     std::string toPacket() {
         std::ostringstream oss;

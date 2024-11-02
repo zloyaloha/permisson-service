@@ -16,23 +16,26 @@ void Server::AcceptConnections() {
 }
 
 Server::Server(boost::asio::io_context& io_context)
-    : _acceptor(io_context, tcp::endpoint(tcp::v4(), PORT)), _threadPool(NUMBER_OF_THREADS) {}
+    : _acceptor(io_context, tcp::endpoint(tcp::v4(), PORT)), _threadPool(NUMBER_OF_THREADS, DB_URL) {}
 
 Session::Session(std::shared_ptr<tcp::socket> socket, std::vector<std::shared_ptr<IServerObserver>>& observers, ThreadPool& threadPool) 
     : _socket(std::move(socket)), _threadPool(threadPool), _worker(std::make_shared<Worker>(threadPool, _socket, _observers)), Observable(observers) {}
 
 void Session::Start() {
-    _data.resize(BUFFER_SIZE);
+    // _data.resize(BUFFER_SIZE);
     ReadMessage();
 }
 
 void Session::ReadMessage() {
     auto self(shared_from_this());
-    _socket->async_read_some(boost::asio::buffer(_data),
-        [this, self](boost::system::error_code ec, std::size_t length) {
+    boost::asio::async_read_until(*_socket, _buffer, '\0',
+        [this, self](boost::system::error_code ec, std::size_t bytes_transferred) {
             if (!ec) {
-                NotifyObservers("Сообщение получено");
-                _threadPool.EnqueueTask([this] { _worker->ProccessOperation(); });
+                std::istream is(&_buffer);
+                std::string data;
+                std::getline(is, data, '\0');
+                NotifyObservers("Сообщение получено\n" + data);
+                _threadPool.EnqueueTask([this, data] { _worker->ProccessOperation(data); });
                 ReadMessage();
             } else {
                 NotifyObservers("Ошибка при получении сообщения " + ec.message());
@@ -59,8 +62,12 @@ void Worker::SendResponse(const std::string& response) {
         });
 }
 
-void Worker::ProccessOperation() {
-    SendResponse("abracadabra123");
+void Worker::ProccessOperation(const std::string &msg) {
+    BaseCommand command(msg);
+    switch (command._op) {
+        case Operation::GetSalt:
+            break;
+    }
 }
 
 
