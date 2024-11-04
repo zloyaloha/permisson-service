@@ -11,4 +11,6 @@ ALTER TABLE public.user_to_group SET SCHEMA permission_app;
 
 GRANT USAGE ON SCHEMA permission_app to app_user;
 GRANT CONNECT ON DATABASE "permission-db" TO app_user;
+GRANT SELECT ON permission_app.users TO app_user;
 GRANT ALL PRIVILEGES ON DATABASE "permission-db" TO db_admin;
+

@@ -2,6 +2,7 @@
 #include <string>
 #include <cstring>
 #include <sstream>
+#include <iostream>
 
 namespace {
     const int BUFFER_SIZE = 65665;
@@ -24,6 +25,7 @@ public:
     {
         std::istringstream stream(msg);
         std::string line;
+        _msg_data = "";
         std::getline(stream, line);
         _op = Operation(std::stoi(line));
         std::getline(stream, line);

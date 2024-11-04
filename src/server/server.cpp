@@ -16,7 +16,7 @@ void Server::AcceptConnections() {
 }
 
 Server::Server(boost::asio::io_context& io_context)
-    : _acceptor(io_context, tcp::endpoint(tcp::v4(), PORT)), _threadPool(NUMBER_OF_THREADS, DB_URL) {}
+    : _acceptor(io_context, tcp::endpoint(tcp::v4(), PORT)), _threadPool(NUMBER_OF_THREADS) {}
 
 Session::Session(std::shared_ptr<tcp::socket> socket, std::vector<std::shared_ptr<IServerObserver>>& observers, ThreadPool& threadPool) 
     : _socket(std::move(socket)), _threadPool(threadPool), _worker(std::make_shared<Worker>(threadPool, _socket, _observers)), Observable(observers) {}
@@ -47,7 +47,7 @@ void Session::ReadMessage() {
 }
 
 Worker::Worker(ThreadPool& threadPool, std::shared_ptr<tcp::socket> socket, std::vector<std::shared_ptr<IServerObserver>>& observers) 
-    : _threadPool(threadPool), _socket(socket), Observable(observers) {}
+    : _threadPool(threadPool), _socket(socket), Observable(observers), _connection(std::make_unique<pqxx::connection>(PARAM_STRING)) {}
 
 void Worker::SendResponse(const std::string& response) {
     auto self(shared_from_this());
@@ -66,11 +66,26 @@ void Worker::ProccessOperation(const std::string &msg) {
     BaseCommand command(msg);
     switch (command._op) {
         case Operation::GetSalt:
+            NotifyObservers("Get salt for " + command._msg_data);
+            SendResponse(GetSalt(command._msg_data));
             break;
     }
 }
 
+std::string Worker::GetSalt(const std::string& login) {
+    pqxx::work work(*_connection);
+    pqxx::result result = work.exec("SELECT permission_app.GetSalt(" + work.quote(login) + ");");
+    std::string res = "";
+    for (const auto &row : result) {
+        res += row[0].as<std::string>();
+    }
+    work.commit();
+    return res;
+}
 
+Worker::~Worker() {
+    _connection->disconnect();
+}
 void Observable::NotifyObservers(const std::string& event) {
     auto now = std::chrono::system_clock::now();
     std::time_t currentTime = std::chrono::system_clock::to_time_t(now);

@@ -31,6 +31,7 @@ class HelloWindow : public QMainWindow {
         HelloWindow(QWidget *pwgt = nullptr);
         ~HelloWindow() {}
     public slots:
+        void ToRegistrationButtonClicked();
         void RegistrationButtonClicked();
         void LoginButtonClicked();
 private:

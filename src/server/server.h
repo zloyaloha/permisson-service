@@ -16,7 +16,17 @@ class IServerObserver;
 namespace {
     const int PORT = 12345;
     const int NUMBER_OF_THREADS = 4;
-    // const std::string DB_URL = 
+    const std::string DB_HOST = "localhost";
+    const std::string DB_PORT = "5432";
+    const std::string DB_NAME = "permission-db";
+    const std::string DB_USER = "app_user";
+    const std::string DB_PASSWORD = "sup1234";
+    const std::string PARAM_STRING = 
+        "host=" + DB_HOST + 
+        " port=" + DB_PORT + 
+        " dbname=" + DB_NAME + 
+        " user=" + DB_USER + 
+        " password=" + DB_PASSWORD; 
 }
 
 class Observable {
@@ -40,11 +50,14 @@ private:
 
 class Worker : public std::enable_shared_from_this<Worker>, public Observable {
     public:
-        Worker(ThreadPool& threadPool, std::shared_ptr<tcp::socket> socket, std::vector<std::shared_ptr<IServerObserver>>& observers);
+        Worker(ThreadPool& threadPool, std::shared_ptr<tcp::socket> socket, std::vector<std::shared_ptr<IServerObserver>>& observer);
+        ~Worker();
         void SendResponse(const std::string& response);
         void ProccessOperation(const std::string& message);
+        std::string GetSalt(const std::string& login);
     private:
         ThreadPool& _threadPool;
+        std::unique_ptr<pqxx::connection> _connection;
         std::shared_ptr<tcp::socket> _socket;
 };
 

@@ -6,8 +6,9 @@ HelloWindow::HelloWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
-    connect(ui->registrationButton, &QPushButton::clicked, this, &HelloWindow::RegistrationButtonClicked);
+    connect(ui->registrationButton, &QPushButton::clicked, this, &HelloWindow::ToRegistrationButtonClicked);
     connect(ui->loginButton, &QPushButton::clicked, this, &HelloWindow::LoginButtonClicked);
+    connect(ui->registrationRegistrationButton, &QPushButton::clicked, this, &HelloWindow::RegistrationButtonClicked);
 
     boost::asio::io_context io_context;
     _commandHandler = std::make_shared<CommandHandler>(io_context);
@@ -16,10 +17,14 @@ HelloWindow::HelloWindow(QWidget *parent)
     _commandHandler->Connect(SERVER_ADDRESS, PORT);
 }
 
+void HelloWindow::ToRegistrationButtonClicked()
+{
+    ui->stackedWidget->setCurrentIndex(1);
+}
+
 void HelloWindow::RegistrationButtonClicked()
 {
-    RegistrationDialog regDialog(this);
-    regDialog.exec();
+    ui->stackedWidget->setCurrentIndex(1);
 }
 
 void HelloWindow::LoginButtonClicked()
@@ -47,6 +52,9 @@ void HelloWindow::LoginButtonClicked()
     std::cout << "Checks out" << std::endl;
     _commandHandler->SendCommand(Operation::GetSalt, login.toStdString());
     std::string response = _commandHandler->ReadResponse();
+    if (response == "") {
+        std::cout << "Пользователь не найден" << std::endl;
+    }
     // std::cout << response << std::endl;
     // _commandHandler->SendCommand(Operation::Login, login.toStdString() + ' ' + password.toStdString() + '\0');
 }

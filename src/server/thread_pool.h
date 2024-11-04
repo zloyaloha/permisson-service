@@ -14,13 +14,12 @@
 
 class ThreadPool {
 public:
-    ThreadPool(size_t numThreads, const std::string& url);
+    ThreadPool(size_t numThreads);
     ~ThreadPool();
     void EnqueueTask(std::function<void()> task);
 private:
-    boost::asio::io_service _ioService;
+    boost::asio::io_context _ioContext;
     boost::asio::executor_work_guard<boost::asio::io_service::executor_type> _workGuard;
     std::vector<boost::thread> _threads;
-    std::shared_ptr<pqxx::connection> _connection;
     bool _stop;
 };
