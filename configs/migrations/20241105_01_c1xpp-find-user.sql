@@ -12,7 +12,7 @@ BEGIN
     -- Проверка на существование пользователя с логином username
     SELECT EXISTS (
         SELECT 1
-        FROM users
+        FROM permission_app.users
         WHERE login = username
     ) INTO user_exists;
 

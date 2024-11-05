@@ -21,6 +21,8 @@ HelloWindow::HelloWindow(QWidget *parent)
 void HelloWindow::ToRegistrationButtonClicked()
 {
     ui->stackedWidget->setCurrentIndex(1);
+    ui->loginRegistration->setText("");
+    ui->passwordRegistration->setText("");
 }
 
 void HelloWindow::BackToLoginWindowButtonClicked()
@@ -30,12 +32,22 @@ void HelloWindow::BackToLoginWindowButtonClicked()
 
 void HelloWindow::RegistrationButtonClicked()
 {
-    QString login = ui->login->text();
-    QString password = ui->password->text();
+    QString login = ui->loginRegistration->text();
+    QString password = ui->passwordRegistration->text();
     if (!_stringHandler->ValidInput(login, password)) {
         return;
     }
     _commandHandler->SendCommand(Operation::Registrate, {login.toStdString(), password.toStdString()});
+    std::string response = _commandHandler->ReadResponse();
+    if (response == "Success") {
+        ui->stackedWidget->setCurrentIndex(0);
+    } else if (response == "Exists") {
+        ui->loginRegistration->setReadOnly(true);
+        ui->loginRegistration->setText("Пользователь с таким именем уже существует");
+        ui->loginRegistration->setStyleSheet("QLineEdit { color: red; }");
+        ui->loginRegistration->setText("");
+        ui->passwordRegistration->setText("");
+    }
 }
 
 void HelloWindow::LoginButtonClicked()
@@ -56,6 +68,7 @@ void HelloWindow::LoginButtonClicked()
 
 LoginAndPasswordValid StringHandler::IsValidLogin(const QString& login) {
     if (login.size() < MIN_LOGIN_SIZE || login.size() > MAX_LOGIN_SIZE) {
+        std::cout << login.size() << std::endl;
         return LoginAndPasswordValid::InvalidLen;
     }
     static QRegularExpression regex("^[a-zA-Z0-9]+$");
@@ -64,6 +77,7 @@ LoginAndPasswordValid StringHandler::IsValidLogin(const QString& login) {
 
 LoginAndPasswordValid StringHandler::IsValidPassword(const QString& password) {
     if (password.size() < MIN_PASSWORD_SIZE) {
+        std::cout << "???" << std::endl;
         return LoginAndPasswordValid::InvalidLen;
     }
     static QRegularExpression regex("^[a-zA-Z0-9@$!%*?&]+$");

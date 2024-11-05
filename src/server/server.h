@@ -6,6 +6,9 @@
 #include <chrono>
 #include <fstream>
 #include <iomanip>
+#include <openssl/sha.h>
+#include <openssl/rand.h>
+
 #include "thread_pool.h"
 #include "message.h"
 
@@ -55,8 +58,16 @@ class Worker : public std::enable_shared_from_this<Worker>, public Observable {
         void SendResponse(const std::string& response);
         void ProccessOperation(const std::string& message);
         std::string Registrate(const std::string& login, const std::string& password);
-        std::string GetSalt(const std::string& login);
     private:
+        std::string GenerateSalt(std::size_t size = 16) const; // bytes
+        std::string HashPassword(const std::string& password, const std::string& salt) const;
+        std::string ToHexString(const unsigned char* data, std::size_t length) const;
+        std::string GetSalt(const std::string& login);
+        void CreateUser(const std::string& login, const std::string& hashed_password, const std::string& salt);
+        bool CheckUserExist(const std::string& login);
+
+    private:
+    
         ThreadPool& _threadPool;
         std::unique_ptr<pqxx::connection> _connection;
         std::shared_ptr<tcp::socket> _socket;

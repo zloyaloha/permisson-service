@@ -5,10 +5,10 @@ CREATE TABLE IF NOT EXISTs users (
     user_id SERIAL PRIMARY KEY,
     login VARCHAR(50) NOT NULL,
     password VARCHAR(100) NOT NULL,
-    session_id INT,
-    salt INT,
+    session_id INT DEFAULT NULL,
+    salt VARCHAR(50) NOT NULL,
     time_registration TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    root BOOL
+    root BOOL DEFAULT FALSE
 );
 
 CREATE TABLE IF NOT EXISTS groups (

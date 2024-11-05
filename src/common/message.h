@@ -37,11 +37,11 @@ public:
     std::string toPacket() {
         std::ostringstream oss;
         oss << int(_op) << '\n' << _pid << '\n';
-        int i = 0;
-        for (i; i < _msg_data.size() - 1; ++i) {
+        std::cout << _msg_data.size() << std::endl;
+        for (int i = 0; i < _msg_data.size() - 1; i++) {
             oss << _msg_data[i] << '\n';
         }
-        oss << _msg_data[++i] << '\0';
+        oss << _msg_data[_msg_data.size() - 1] << '\0';
         return oss.str();
     }
 };

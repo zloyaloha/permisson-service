@@ -64,11 +64,12 @@ void Worker::SendResponse(const std::string& response) {
 
 void Worker::ProccessOperation(const std::string &msg) {
     BaseCommand command(msg);
+    static std::string result;
     switch (command._op) {
         case Operation::Registrate:
             NotifyObservers("Registrate " + command._msg_data[0]);
-            Registrate(command._msg_data[0], command._msg_data[1]); // login, password
-            // SendResponse(GetSalt(command._msg_data));
+            result = Registrate(command._msg_data[0], command._msg_data[1]); // login, password
+            SendResponse(result);
             break;
     }
 }
@@ -84,21 +85,76 @@ std::string Worker::GetSalt(const std::string& login) {
     return res;
 }
 
+
 std::string Worker::Registrate(const std::string& login, const std::string& password) {
+    if (CheckUserExist(login)) {
+        return "Exists";
+    }
+    std::string salt = GenerateSalt();
+    std::string hashedPassword = HashPassword(password, salt);
+    CreateUser(login, hashedPassword, salt);
+    return "Success";
+}
+
+bool Worker::CheckUserExist(const std::string& login) {
     pqxx::work work(*_connection);
-    pqxx::result result = work.exec("SELECT permission_app.UserExist(" + work.quote(login) + ");");
+    pqxx::result result = work.exec("SELECT permission_app.UserExists(" + work.quote(login) + ");");
     std::string res = "";
     for (const auto &row : result) {
         res += row[0].as<std::string>();
     }
-    if (res != "") {
-        return "Exists";
+    if (res == "t") {
+        return true;
     }
+    work.commit();
+    return false;
+}
+
+void Worker::CreateUser(const std::string &username, const std::string& hashed_password, const std::string& salt) {
+    pqxx::work work(*_connection);
+    pqxx::result result = work.exec("CALL permission_app.CreateUser(" 
+                                        + work.quote(username) + ", "
+                                        + work.quote(hashed_password) + ", "
+                                        + work.quote(salt) + ");");
+    std::string res = "";
+    for (const auto &row : result) {
+        res += row[0].as<std::string>();
+    }
+    work.commit();
+}
+
+std::string Worker::GenerateSalt(std::size_t size) const {
+    unsigned char salt[size];
+    if (!RAND_bytes(salt, sizeof(salt))) {
+        throw std::runtime_error("Error generating random bytes.");
+    }
+    return ToHexString(salt, size);
+}
+
+std::string Worker::HashPassword(const std::string& password, const std::string& salt) const {
+    std::string saltedPassword = password + salt;
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    SHA256(reinterpret_cast<const unsigned char*>(saltedPassword.c_str()), saltedPassword.length(), hash);
+
+    std::stringstream ss;
+    for (int i = 0; i < SHA256_DIGEST_LENGTH; ++i) {
+        ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(hash[i]);
+    }
+    return ss.str();
+}
+
+std::string Worker::ToHexString(const unsigned char* data, std::size_t length) const {
+    std::stringstream ss;
+    for (std::size_t i = 0; i < length; ++i) {
+        ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(data[i]);
+    }
+    return ss.str();
 }
 
 Worker::~Worker() {
     _connection->disconnect();
 }
+
 void Observable::NotifyObservers(const std::string& event) {
     auto now = std::chrono::system_clock::now();
     std::time_t currentTime = std::chrono::system_clock::to_time_t(now);
