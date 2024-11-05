@@ -54,6 +54,7 @@ class Worker : public std::enable_shared_from_this<Worker>, public Observable {
         ~Worker();
         void SendResponse(const std::string& response);
         void ProccessOperation(const std::string& message);
+        std::string Registrate(const std::string& login, const std::string& password);
         std::string GetSalt(const std::string& login);
     private:
         ThreadPool& _threadPool;

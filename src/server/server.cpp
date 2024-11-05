@@ -65,9 +65,10 @@ void Worker::SendResponse(const std::string& response) {
 void Worker::ProccessOperation(const std::string &msg) {
     BaseCommand command(msg);
     switch (command._op) {
-        case Operation::GetSalt:
-            NotifyObservers("Get salt for " + command._msg_data);
-            SendResponse(GetSalt(command._msg_data));
+        case Operation::Registrate:
+            NotifyObservers("Registrate " + command._msg_data[0]);
+            Registrate(command._msg_data[0], command._msg_data[1]); // login, password
+            // SendResponse(GetSalt(command._msg_data));
             break;
     }
 }
@@ -81,6 +82,18 @@ std::string Worker::GetSalt(const std::string& login) {
     }
     work.commit();
     return res;
+}
+
+std::string Worker::Registrate(const std::string& login, const std::string& password) {
+    pqxx::work work(*_connection);
+    pqxx::result result = work.exec("SELECT permission_app.UserExist(" + work.quote(login) + ");");
+    std::string res = "";
+    for (const auto &row : result) {
+        res += row[0].as<std::string>();
+    }
+    if (res != "") {
+        return "Exists";
+    }
 }
 
 Worker::~Worker() {

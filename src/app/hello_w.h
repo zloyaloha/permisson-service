@@ -34,6 +34,7 @@ class HelloWindow : public QMainWindow {
         void ToRegistrationButtonClicked();
         void RegistrationButtonClicked();
         void LoginButtonClicked();
+        void BackToLoginWindowButtonClicked();
 private:
     Ui::HelloWindow *ui;
     std::shared_ptr<CommandHandler> _commandHandler;
@@ -45,5 +46,5 @@ class StringHandler {
         StringHandler() = default;
         LoginAndPasswordValid IsValidLogin(const QString& password);
         LoginAndPasswordValid IsValidPassword(const QString& password);
-        std::string HashPassword(const QString& password);
+        bool ValidInput(const QString& login, const QString& password);
 };

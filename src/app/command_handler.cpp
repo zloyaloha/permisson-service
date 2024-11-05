@@ -13,10 +13,10 @@ void CommandHandler::Connect(const std::string &host, const std::string& port) {
     }
 }
 
-void CommandHandler::SendCommand(const Operation op, const std::string& msg_data) {
+void CommandHandler::SendCommand(const Operation op, const std::initializer_list<std::string>& data) {
     try {
         if (socket.is_open()) {
-            BaseCommand msg(op, getpid(), msg_data);
+            BaseCommand msg(op, getpid(), data);
             boost::asio::write(socket, boost::asio::buffer(msg.toPacket()));
             std::cout << "Command sent:\n" << msg.toPacket() << std::endl;
         } else {
