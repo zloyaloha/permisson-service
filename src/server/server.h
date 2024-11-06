@@ -58,14 +58,16 @@ class Worker : public std::enable_shared_from_this<Worker>, public Observable {
         void SendResponse(const std::string& response);
         void ProccessOperation(const std::string& message);
         std::string Registrate(const std::string& login, const std::string& password);
+        std::string Login(const std::string& login, const std::string& password);
     private:
         std::string GenerateSalt(std::size_t size = 16) const; // bytes
         std::string HashPassword(const std::string& password, const std::string& salt) const;
         std::string ToHexString(const unsigned char* data, std::size_t length) const;
-        std::string GetSalt(const std::string& login);
+        std::pair<std::string, std::string> GetSaltAndPassword(const std::string& login);
         void CreateUser(const std::string& login, const std::string& hashed_password, const std::string& salt);
         bool CheckUserExist(const std::string& login);
-
+        std::string GetStringQueryResult(const pqxx::result& result) const;
+        std::pair<std::string, std::string> GetPairQueryResult(const pqxx::result& result) const;
     private:
     
         ThreadPool& _threadPool;

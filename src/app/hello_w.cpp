@@ -57,10 +57,10 @@ void HelloWindow::LoginButtonClicked()
     if (!_stringHandler->ValidInput(login, password)) {
         return;
     }
-    _commandHandler->SendCommand(Operation::Login, {login.toStdString()});
+    _commandHandler->SendCommand(Operation::Login, {login.toStdString(), password.toStdString()});
     std::string response = _commandHandler->ReadResponse();
     if (response == "") {
-        std::cout << "Пользователь не найден" << std::endl;
+        std::cout << "Пароль неверный" << std::endl;
     }
     // std::cout << response << std::endl;
     // _commandHandler->SendCommand(Operation::Login, login.toStdString() + ' ' + password.toStdString() + '\0');

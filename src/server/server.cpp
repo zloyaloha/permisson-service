@@ -71,20 +71,33 @@ void Worker::ProccessOperation(const std::string &msg) {
             result = Registrate(command._msg_data[0], command._msg_data[1]); // login, password
             SendResponse(result);
             break;
+        case Operation::Login:
+            NotifyObservers("Log in " + command._msg_data[0]);
+            result = Login(command._msg_data[0], command._msg_data[1]); // login, password
+            SendResponse(result);
     }
 }
 
-std::string Worker::GetSalt(const std::string& login) {
+std::pair<std::string, std::string> Worker::GetSaltAndPassword(const std::string& login) {
     pqxx::work work(*_connection);
-    pqxx::result result = work.exec("SELECT permission_app.GetSalt(" + work.quote(login) + ");");
-    std::string res = "";
-    for (const auto &row : result) {
-        res += row[0].as<std::string>();
-    }
+    pqxx::result result = work.exec("SELECT permission_app.GetSaltAndPassword(" + work.quote(login) + ");");
     work.commit();
-    return res;
+    return GetPairQueryResult(result);  
 }
 
+std::string Worker::Login(const std::string& login, const std::string& password) {
+    if (!CheckUserExist(login)) {
+        return "Not exists";
+    }
+    std::pair<std::string, std::string> passwordAndSalt = GetSaltAndPassword(login);
+    std::string hashedPassword = HashPassword(password, passwordAndSalt.second);
+    // std::cout << hashedPassword << std::endl;
+    if (!hashedPassword == passwordAndSalt.first) {
+        return "";
+    }
+    
+    return "Success";
+}
 
 std::string Worker::Registrate(const std::string& login, const std::string& password) {
     if (CheckUserExist(login)) {
@@ -99,11 +112,8 @@ std::string Worker::Registrate(const std::string& login, const std::string& pass
 bool Worker::CheckUserExist(const std::string& login) {
     pqxx::work work(*_connection);
     pqxx::result result = work.exec("SELECT permission_app.UserExists(" + work.quote(login) + ");");
-    std::string res = "";
-    for (const auto &row : result) {
-        res += row[0].as<std::string>();
-    }
-    if (res == "t") {
+    std::string response = GetStringQueryResult(result);
+    if (response == "t") {
         return true;
     }
     work.commit();
@@ -116,10 +126,6 @@ void Worker::CreateUser(const std::string &username, const std::string& hashed_p
                                         + work.quote(username) + ", "
                                         + work.quote(hashed_password) + ", "
                                         + work.quote(salt) + ");");
-    std::string res = "";
-    for (const auto &row : result) {
-        res += row[0].as<std::string>();
-    }
     work.commit();
 }
 
@@ -149,6 +155,26 @@ std::string Worker::ToHexString(const unsigned char* data, std::size_t length) c
         ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(data[i]);
     }
     return ss.str();
+}
+
+std::string Worker::GetStringQueryResult(const pqxx::result& result) const {
+    std::string res = "";
+    for (const auto &row : result) {
+        res += row[0].as<std::string>();
+    }
+    return res;
+}
+
+std::pair<std::string, std::string> Worker::GetPairQueryResult(const pqxx::result& result) const {
+    std::string res = "";
+    for (const auto &row : result) {
+        res += row[0].as<std::string>();
+    }
+    res = res.substr(1, res.size() - 2); 
+    size_t comma = res.find(',');
+    std::string password = res.substr(0, comma);
+    std::string salt = res.substr(comma + 1);
+    return std::make_pair(password, salt);  
 }
 
 Worker::~Worker() {
