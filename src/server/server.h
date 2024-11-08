@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <boost/asio.hpp>
+#include <boost/beast.hpp>
 #include <string>
 #include <ctime>
 #include <chrono>
@@ -12,7 +13,9 @@
 #include "thread_pool.h"
 #include "message.h"
 
-using boost::asio::ip::tcp;
+using tcp = boost::asio::ip::tcp;
+namespace beast = boost::beast;
+namespace http = beast::http;
 
 class IServerObserver;
 
@@ -55,17 +58,22 @@ class Worker : public std::enable_shared_from_this<Worker>, public Observable {
     public:
         Worker(ThreadPool& threadPool, std::shared_ptr<tcp::socket> socket, std::vector<std::shared_ptr<IServerObserver>>& observer);
         ~Worker();
-        void SendResponse(const std::string& response);
-        void ProccessOperation(const std::string& message);
+        void SendResponse(const Operation op, const std::initializer_list<std::string>& data);
+        void ProccessOperation(const BaseCommand &command);
         std::string Registrate(const std::string& login, const std::string& password);
-        std::string Login(const std::string& login, const std::string& password);
+        std::pair<std::string, std::string> Login(const std::string& login, const std::string& password);
+        void Quit(const std::string& token);
     private:
+        void QuitSession();
+        bool ValidateRequest(const int user_id, const std::string token);
+        std::string GetToken(const int user_id);
+        std::string CreateSession(const int user_id);
         std::string GenerateSalt(std::size_t size = 16) const; // bytes
         std::string HashPassword(const std::string& password, const std::string& salt) const;
         std::string ToHexString(const unsigned char* data, std::size_t length) const;
         std::pair<std::string, std::string> GetSaltAndPassword(const std::string& login);
         void CreateUser(const std::string& login, const std::string& hashed_password, const std::string& salt);
-        bool CheckUserExist(const std::string& login);
+        int UserID(const std::string& login);
         std::string GetStringQueryResult(const pqxx::result& result) const;
         std::pair<std::string, std::string> GetPairQueryResult(const pqxx::result& result) const;
     private:

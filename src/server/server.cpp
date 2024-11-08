@@ -34,8 +34,16 @@ void Session::ReadMessage() {
                 std::istream is(&_buffer);
                 std::string data;
                 std::getline(is, data, '\0');
+                BaseCommand command(data);
+                if (command._op == Operation::Quit) {
+                    if (command._msg_data[0] != "0") { // logged connection
+                        _worker->ProccessOperation(command);
+                    }
+                    _socket->close();
+                    return;
+                }
                 NotifyObservers("Сообщение получено\n" + data);
-                _threadPool.EnqueueTask([this, data] { _worker->ProccessOperation(data); });
+                _threadPool.EnqueueTask([this, command] { _worker->ProccessOperation(command); });
                 ReadMessage();
             } else {
                 NotifyObservers("Ошибка при получении сообщения " + ec.message());
@@ -49,9 +57,10 @@ void Session::ReadMessage() {
 Worker::Worker(ThreadPool& threadPool, std::shared_ptr<tcp::socket> socket, std::vector<std::shared_ptr<IServerObserver>>& observers) 
     : _threadPool(threadPool), _socket(socket), Observable(observers), _connection(std::make_unique<pqxx::connection>(PARAM_STRING)) {}
 
-void Worker::SendResponse(const std::string& response) {
+void Worker::SendResponse(const Operation op, const std::initializer_list<std::string>& data) {
     auto self(shared_from_this());
-    boost::asio::async_write(*_socket, boost::asio::buffer(response + '\0'),
+    BaseCommand msg(op, getpid(), data);
+    boost::asio::async_write(*_socket, boost::asio::buffer(msg.toPacket()),
         [this, self](boost::system::error_code ec, std::size_t) {
             if (ec) {
                 NotifyObservers("Ошибка при отправке ответа " + ec.message());
@@ -62,20 +71,76 @@ void Worker::SendResponse(const std::string& response) {
         });
 }
 
-void Worker::ProccessOperation(const std::string &msg) {
-    BaseCommand command(msg);
+bool Worker::ValidateRequest(const int user_id, const std::string token) {
+    std::string userToken = GetToken(user_id); 
+    if (userToken == token) {
+        return true;
+    }
+    return false;
+}
+
+std::string Worker::GetToken(const int user_id) {
+    pqxx::work work(*_connection);
+    pqxx::result result = work.exec("SELECT permission_app.GetToken(" + work.quote(user_id) + ");");
+    work.commit();
+    return GetStringQueryResult(result);
+}
+
+
+void Worker::ProccessOperation(const BaseCommand &command) {
     static std::string result;
+    std::pair<std::string, std::string> user_idAndToken;
     switch (command._op) {
         case Operation::Registrate:
             NotifyObservers("Registrate " + command._msg_data[0]);
             result = Registrate(command._msg_data[0], command._msg_data[1]); // login, password
-            SendResponse(result);
+            SendResponse(command._op, {result}); // 
             break;
         case Operation::Login:
             NotifyObservers("Log in " + command._msg_data[0]);
-            result = Login(command._msg_data[0], command._msg_data[1]); // login, password
-            SendResponse(result);
+            user_idAndToken = Login(command._msg_data[0], command._msg_data[1]); // login, password
+            SendResponse(command._op, {user_idAndToken.first, user_idAndToken.second});
+            break;
+        case Operation::Quit:
+            NotifyObservers("Quit" + command._msg_data[0]);
+            if (!ValidateRequest(std::stoi(command._msg_data[0]), command._msg_data[1])) { // user_id, token
+                NotifyObservers("Security warning");
+                break;
+            }
+            Quit(command._msg_data[0]); // user_id
+            _connection->disconnect();
+            break;
     }
+}
+
+void Worker::Quit(const std::string& token) {
+    pqxx::work work(*_connection);
+    pqxx::result result = work.exec("CALL permission_app.UpdateExitTime(" + work.quote(token) + ");");
+    work.commit();
+}
+
+std::pair<std::string, std::string> Worker::Login(const std::string& login, const std::string& password) {
+    int user_id = UserID(login);
+    if (user_id == 0) {
+        return std::make_pair("Invalid username", "");
+    }
+    std::pair<std::string, std::string> passwordAndSalt = GetSaltAndPassword(login);
+    std::string hashedPassword = HashPassword(password, passwordAndSalt.second);
+    if (hashedPassword != passwordAndSalt.first) {
+        return std::make_pair("Invalid password", "");
+    }
+    std::string token = CreateSession(user_id);
+    return std::make_pair(std::to_string(user_id), token);
+}
+
+std::string Worker::Registrate(const std::string& login, const std::string& password) {
+    if (UserID(login) != 0) {
+        return "Exists";
+    }
+    std::string salt = GenerateSalt();
+    std::string hashedPassword = HashPassword(password, salt);
+    CreateUser(login, hashedPassword, salt);
+    return "Success";
 }
 
 std::pair<std::string, std::string> Worker::GetSaltAndPassword(const std::string& login) {
@@ -85,39 +150,22 @@ std::pair<std::string, std::string> Worker::GetSaltAndPassword(const std::string
     return GetPairQueryResult(result);  
 }
 
-std::string Worker::Login(const std::string& login, const std::string& password) {
-    if (!CheckUserExist(login)) {
-        return "Not exists";
-    }
-    std::pair<std::string, std::string> passwordAndSalt = GetSaltAndPassword(login);
-    std::string hashedPassword = HashPassword(password, passwordAndSalt.second);
-    // std::cout << hashedPassword << std::endl;
-    if (!hashedPassword == passwordAndSalt.first) {
-        return "";
-    }
-    
-    return "Success";
-}
 
-std::string Worker::Registrate(const std::string& login, const std::string& password) {
-    if (CheckUserExist(login)) {
-        return "Exists";
-    }
-    std::string salt = GenerateSalt();
-    std::string hashedPassword = HashPassword(password, salt);
-    CreateUser(login, hashedPassword, salt);
-    return "Success";
-}
-
-bool Worker::CheckUserExist(const std::string& login) {
+std::string Worker::CreateSession(const int user_id) {
     pqxx::work work(*_connection);
-    pqxx::result result = work.exec("SELECT permission_app.UserExists(" + work.quote(login) + ");");
+    pqxx::result result = work.exec("SELECT permission_app.AddSession(" + work.quote(user_id) + ");");
     std::string response = GetStringQueryResult(result);
-    if (response == "t") {
-        return true;
-    }
     work.commit();
-    return false;
+    return response;
+}
+
+
+int Worker::UserID(const std::string& login) {
+    pqxx::work work(*_connection);
+    pqxx::result result = work.exec("SELECT permission_app.UserID(" + work.quote(login) + ");");
+    std::string response = GetStringQueryResult(result);
+    work.commit();
+    return std::stoi(response);
 }
 
 void Worker::CreateUser(const std::string &username, const std::string& hashed_password, const std::string& salt) {

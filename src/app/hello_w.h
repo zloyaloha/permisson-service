@@ -9,8 +9,6 @@
 #include "ui_hello_w.h"
 #include "registration_w.h"
 #include "command_handler.h"
-// #include <openssl/evp.h>
-// #include <openssl/sha.h>
 
 namespace {
     const int MIN_LOGIN_SIZE = 3;
@@ -29,7 +27,7 @@ class HelloWindow : public QMainWindow {
     Q_OBJECT
     public:
         HelloWindow(QWidget *pwgt = nullptr);
-        ~HelloWindow() {}
+        ~HelloWindow();
     public slots:
         void ToRegistrationButtonClicked();
         void RegistrationButtonClicked();
@@ -39,6 +37,8 @@ private:
     Ui::HelloWindow *ui;
     std::shared_ptr<CommandHandler> _commandHandler;
     std::shared_ptr<StringHandler> _stringHandler;
+    std::string _token;
+    int _user_id;
 };
 
 class StringHandler {

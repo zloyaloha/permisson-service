@@ -19,5 +19,5 @@ class CommandHandler: public std::enable_shared_from_this<CommandHandler> {
         CommandHandler(boost::asio::io_context& io_context);
         void Connect(const std::string &host, const std::string& port);
         void SendCommand(const Operation op, const std::initializer_list<std::string>& data);
-        std::string ReadResponse();
+        BaseCommand ReadResponse();
 };

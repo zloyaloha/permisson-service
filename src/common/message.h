@@ -10,7 +10,8 @@ namespace {
 
 enum Operation {
     Login,
-    Registrate
+    Registrate,
+    Quit
 };
 
 class BaseCommand {
@@ -37,7 +38,9 @@ public:
     std::string toPacket() {
         std::ostringstream oss;
         oss << int(_op) << '\n' << _pid << '\n';
-        std::cout << _msg_data.size() << std::endl;
+        if (_msg_data.size() == 0) {
+            return "";
+        }
         for (int i = 0; i < _msg_data.size() - 1; i++) {
             oss << _msg_data[i] << '\n';
         }

@@ -2,7 +2,7 @@
 
 
 HelloWindow::HelloWindow(QWidget *parent)
-    : QMainWindow(parent), ui(new Ui::HelloWindow)
+    : QMainWindow(parent), ui(new Ui::HelloWindow), _user_id(0), _token("")
 {
     ui->setupUi(this);
 
@@ -16,6 +16,10 @@ HelloWindow::HelloWindow(QWidget *parent)
     _stringHandler = std::make_shared<StringHandler>();
     ui->stackedWidget->setCurrentIndex(0);
     _commandHandler->Connect(SERVER_ADDRESS, PORT);
+}
+
+HelloWindow::~HelloWindow() {
+    _commandHandler->SendCommand(Operation::Quit, {std::to_string(_user_id), _token});
 }
 
 void HelloWindow::ToRegistrationButtonClicked()
@@ -38,10 +42,10 @@ void HelloWindow::RegistrationButtonClicked()
         return;
     }
     _commandHandler->SendCommand(Operation::Registrate, {login.toStdString(), password.toStdString()});
-    std::string response = _commandHandler->ReadResponse();
-    if (response == "Success") {
+    BaseCommand response(_commandHandler->ReadResponse());
+    if (response._msg_data[0] == "Success") {
         ui->stackedWidget->setCurrentIndex(0);
-    } else if (response == "Exists") {
+    } else if (response._msg_data[0] == "Exists") {
         ui->loginRegistration->setReadOnly(true);
         ui->loginRegistration->setText("Пользователь с таким именем уже существует");
         ui->loginRegistration->setStyleSheet("QLineEdit { color: red; }");
@@ -58,12 +62,15 @@ void HelloWindow::LoginButtonClicked()
         return;
     }
     _commandHandler->SendCommand(Operation::Login, {login.toStdString(), password.toStdString()});
-    std::string response = _commandHandler->ReadResponse();
-    if (response == "") {
+    BaseCommand response(_commandHandler->ReadResponse());
+    if (response._msg_data[0] == "Not exists") {
+        std::cout << "Пользователя не существует" << std::endl;
+    } else if (response._msg_data[0] == "Invalid Password") {
         std::cout << "Пароль неверный" << std::endl;
+    } else {
+        _user_id = std::stoi(response._msg_data[0]);
+        _token = response._msg_data[1];
     }
-    // std::cout << response << std::endl;
-    // _commandHandler->SendCommand(Operation::Login, login.toStdString() + ' ' + password.toStdString() + '\0');
 }
 
 LoginAndPasswordValid StringHandler::IsValidLogin(const QString& login) {
