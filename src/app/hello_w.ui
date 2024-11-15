@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>884</width>
-    <height>826</height>
+    <width>800</width>
+    <height>76</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -32,39 +32,42 @@
      <height>0</height>
     </size>
    </property>
-   <layout class="QHBoxLayout" name="horizontalLayout_5">
+   <layout class="QHBoxLayout" name="horizontalLayout">
     <item>
      <widget class="QStackedWidget" name="stackedWidget">
       <property name="styleSheet">
        <string notr="true">backgroud-color: rgb(246, 245, 244)</string>
       </property>
       <property name="currentIndex">
-       <number>1</number>
+       <number>0</number>
       </property>
       <widget class="QWidget" name="loginPage">
+       <property name="minimumSize">
+        <size>
+         <width>782</width>
+         <height>16</height>
+        </size>
+       </property>
        <property name="sizeIncrement">
         <size>
          <width>10</width>
          <height>10</height>
         </size>
        </property>
-       <widget class="QWidget" name="loginLayot" native="true">
+       <widget class="QWidget" name="layoutWidget">
         <property name="geometry">
          <rect>
-          <x>230</x>
-          <y>230</y>
-          <width>411</width>
-          <height>271</height>
+          <x>250</x>
+          <y>120</y>
+          <width>241</width>
+          <height>121</height>
          </rect>
         </property>
-        <property name="styleSheet">
-         <string notr="true">background-color: rgb(246, 245, 244)</string>
-        </property>
-        <layout class="QVBoxLayout" name="loginLayout">
+        <layout class="QVBoxLayout" name="loginPageLayout">
          <item>
-          <layout class="QHBoxLayout" name="loginInputLayot">
-           <item>
-            <widget class="QLabel" name="loginLoginLabel">
+          <layout class="QFormLayout" name="registrationForm">
+           <item row="0" column="0">
+            <widget class="QLabel" name="loginLabel">
              <property name="styleSheet">
               <string notr="true">font: 25 12pt &quot;Ubuntu Light&quot;;</string>
              </property>
@@ -73,15 +76,8 @@
              </property>
             </widget>
            </item>
-           <item>
-            <widget class="QLineEdit" name="login"/>
-           </item>
-          </layout>
-         </item>
-         <item>
-          <layout class="QHBoxLayout" name="passwordLoginInputLayout">
-           <item>
-            <widget class="QLabel" name="passwordLoginLabel">
+           <item row="1" column="0">
+            <widget class="QLabel" name="passwordLabel">
              <property name="styleSheet">
               <string notr="true">font: 25 12pt &quot;Ubuntu Light&quot;;</string>
              </property>
@@ -90,74 +86,78 @@
              </property>
             </widget>
            </item>
-           <item>
-            <widget class="QLineEdit" name="password"/>
+           <item row="0" column="1">
+            <widget class="QLineEdit" name="loginText"/>
+           </item>
+           <item row="1" column="1">
+            <widget class="QLineEdit" name="passwordText"/>
            </item>
           </layout>
          </item>
          <item>
-          <widget class="QPushButton" name="loginButton">
-           <property name="text">
-            <string>Вход</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="registrationButton">
-           <property name="text">
-            <string>Регистрация</string>
-           </property>
-          </widget>
+          <layout class="QVBoxLayout" name="buttonsLayout">
+           <item>
+            <widget class="QPushButton" name="loginButton">
+             <property name="text">
+              <string>Вход</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="registrationButton">
+             <property name="text">
+              <string>Регистрация</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
          </item>
         </layout>
        </widget>
       </widget>
       <widget class="QWidget" name="registrationPage">
-       <widget class="QWidget" name="registrationLayot" native="true">
+       <widget class="QWidget" name="">
         <property name="geometry">
          <rect>
-          <x>210</x>
-          <y>200</y>
-          <width>461</width>
-          <height>311</height>
+          <x>280</x>
+          <y>100</y>
+          <width>231</width>
+          <height>131</height>
          </rect>
         </property>
-        <property name="styleSheet">
-         <string notr="true">background-color: rgb(246, 245, 244)</string>
-        </property>
-        <layout class="QVBoxLayout" name="registrationLayout">
+        <layout class="QVBoxLayout" name="registrationPageLayout">
          <item>
-          <layout class="QVBoxLayout" name="verticalLayout">
-           <item>
-            <layout class="QGridLayout" name="registrationGridInput">
-             <item row="0" column="0">
-              <widget class="QLabel" name="loginLabelRegistration">
-               <property name="styleSheet">
-                <string notr="true">font: 25 12pt &quot;Ubuntu Light&quot;;</string>
-               </property>
-               <property name="text">
-                <string>Логин   </string>
-               </property>
-              </widget>
-             </item>
-             <item row="0" column="1">
-              <widget class="QLineEdit" name="loginRegistration"/>
-             </item>
-             <item row="1" column="0">
-              <widget class="QLabel" name="passwordLabelRegistration">
-               <property name="styleSheet">
-                <string notr="true">font: 25 12pt &quot;Ubuntu Light&quot;;</string>
-               </property>
-               <property name="text">
-                <string>Пароль</string>
-               </property>
-              </widget>
-             </item>
-             <item row="1" column="1">
-              <widget class="QLineEdit" name="passwordRegistration"/>
-             </item>
-            </layout>
+          <layout class="QFormLayout" name="formLayout">
+           <item row="0" column="0">
+            <widget class="QLabel" name="loginLabelRegistration">
+             <property name="styleSheet">
+              <string notr="true">font: 25 12pt &quot;Ubuntu Light&quot;;</string>
+             </property>
+             <property name="text">
+              <string>Логин   </string>
+             </property>
+            </widget>
            </item>
+           <item row="0" column="1">
+            <widget class="QLineEdit" name="loginRegistration"/>
+           </item>
+           <item row="1" column="0">
+            <widget class="QLabel" name="passwordLabelRegistration">
+             <property name="styleSheet">
+              <string notr="true">font: 25 12pt &quot;Ubuntu Light&quot;;</string>
+             </property>
+             <property name="text">
+              <string>Пароль</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="QLineEdit" name="passwordRegistration"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QVBoxLayout" name="verticalLayout_2">
            <item>
             <widget class="QPushButton" name="registrationRegistrationButton">
              <property name="text">
@@ -186,8 +186,8 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>884</width>
-     <height>26</height>
+     <width>800</width>
+     <height>20</height>
     </rect>
    </property>
   </widget>

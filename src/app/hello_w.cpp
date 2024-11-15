@@ -56,8 +56,8 @@ void HelloWindow::RegistrationButtonClicked()
 
 void HelloWindow::LoginButtonClicked()
 {
-    QString login = ui->login->text();
-    QString password = ui->password->text();
+    QString login = ui->loginText->text();
+    QString password = ui->passwordText->text();
     if (!_stringHandler->ValidInput(login, password)) {
         return;
     }
