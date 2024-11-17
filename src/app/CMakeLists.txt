@@ -15,11 +15,12 @@ include_directories()
 set(WINDOWS_SRC
     main.cpp
     command_handler.cpp
-    hello_w.cpp
-    registration_w.cpp
+    hello_window.cpp
+    main_window.cpp
 )
 
 qt5_wrap_ui(UI_HEADERS hello_w.ui)
+qt5_wrap_ui(UI_HEADERS app_win.ui)
 
 add_executable(app
     ${WINDOWS_SRC}

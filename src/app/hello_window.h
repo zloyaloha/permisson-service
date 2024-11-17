@@ -7,8 +7,8 @@
 #include <QRegularExpression>
 #include <iostream>
 #include "ui_hello_w.h"
-#include "registration_w.h"
 #include "command_handler.h"
+#include "main_window.h"
 
 namespace {
     const int MIN_LOGIN_SIZE = 3;
@@ -35,6 +35,7 @@ class HelloWindow : public QMainWindow {
         void BackToLoginWindowButtonClicked();
 private:
     Ui::HelloWindow *ui;
+    std::unique_ptr<MainWindow> _mainWindow;
     std::shared_ptr<CommandHandler> _commandHandler;
     std::shared_ptr<StringHandler> _stringHandler;
     std::string _token;

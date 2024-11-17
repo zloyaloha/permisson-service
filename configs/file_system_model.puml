@@ -12,7 +12,7 @@ entity file {
 entity user {
     + user_id = serial
     - login = varchar<255>
-    - password = big_integer    
+    - password = big_integer
     - session_id = int
     - time_registration = timestamp
     - root = bool

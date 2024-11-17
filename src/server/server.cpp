@@ -73,6 +73,7 @@ void Worker::SendResponse(const Operation op, const std::initializer_list<std::s
 
 bool Worker::ValidateRequest(const int user_id, const std::string token) {
     std::string userToken = GetToken(user_id); 
+    std::cout << userToken << '\n' << token << std::endl;
     if (userToken == token) {
         return true;
     }
@@ -102,12 +103,12 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             SendResponse(command._op, {user_idAndToken.first, user_idAndToken.second});
             break;
         case Operation::Quit:
-            NotifyObservers("Quit" + command._msg_data[0]);
+            NotifyObservers("Quit " + command._msg_data[1]);
             if (!ValidateRequest(std::stoi(command._msg_data[0]), command._msg_data[1])) { // user_id, token
                 NotifyObservers("Security warning");
                 break;
             }
-            Quit(command._msg_data[0]); // user_id
+            Quit(command._msg_data[1]); // user_id
             _connection->disconnect();
             break;
     }
@@ -149,7 +150,6 @@ std::pair<std::string, std::string> Worker::GetSaltAndPassword(const std::string
     work.commit();
     return GetPairQueryResult(result);  
 }
-
 
 std::string Worker::CreateSession(const int user_id) {
     pqxx::work work(*_connection);

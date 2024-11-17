@@ -1,4 +1,4 @@
-#include "hello_w.h"
+#include "hello_window.h"
 
 
 HelloWindow::HelloWindow(QWidget *parent)
@@ -14,6 +14,7 @@ HelloWindow::HelloWindow(QWidget *parent)
     boost::asio::io_context io_context;
     _commandHandler = std::make_shared<CommandHandler>(io_context);
     _stringHandler = std::make_shared<StringHandler>();
+    _mainWindow = std::make_unique<MainWindow>(_commandHandler);
     ui->stackedWidget->setCurrentIndex(0);
     _commandHandler->Connect(SERVER_ADDRESS, PORT);
 }
@@ -68,8 +69,10 @@ void HelloWindow::LoginButtonClicked()
     } else if (response._msg_data[0] == "Invalid Password") {
         std::cout << "Пароль неверный" << std::endl;
     } else {
+        std::cout << "Удачно зашел" << std::endl;
         _user_id = std::stoi(response._msg_data[0]);
         _token = response._msg_data[1];
+        _mainWindow->SetupWindow(login, 1);
     }
 }
 
