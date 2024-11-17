@@ -3,9 +3,8 @@
 
 CREATE TABLE IF NOT EXISTs users (
     user_id SERIAL PRIMARY KEY,
-    login VARCHAR(50) NOT NULL,
-    password VARCHAR(100) NOT NULL,
-    session_id INT DEFAULT NULL,
+    login VARCHAR(50) NOT NULL UNIQUE,
+    password VARCHAR(100) NOT NULL UNIQUE,
     salt VARCHAR(50) NOT NULL,
     time_registration TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     root BOOL DEFAULT FALSE
