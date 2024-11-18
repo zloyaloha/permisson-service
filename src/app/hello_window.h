@@ -5,6 +5,7 @@
 #include <QDebug>
 #include <QRegExp>
 #include <QRegularExpression>
+#include <QPixmap>
 #include <iostream>
 #include "ui_hello_w.h"
 #include "command_handler.h"
@@ -35,7 +36,7 @@ class HelloWindow : public QMainWindow {
         void BackToLoginWindowButtonClicked();
 private:
     Ui::HelloWindow *ui;
-    std::unique_ptr<MainWindow> _mainWindow;
+    std::shared_ptr<MainWindow> _mainWindow;
     std::shared_ptr<CommandHandler> _commandHandler;
     std::shared_ptr<StringHandler> _stringHandler;
     std::string _token;

@@ -12,8 +12,10 @@ BEGIN
     SELECT root
     INTO user_root
     FROM permission_app.users
-    WHERE login = username
+    WHERE login = username;
+
+    RETURN user_root;
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION permission_app.UserRights(text) TO app_user;
+GRANT EXECUTE ON FUNCTION permission_app.UserRights(TEXT) TO app_user;

@@ -11,7 +11,8 @@ namespace {
 enum Operation {
     Login,
     Registrate,
-    Quit
+    Quit, 
+    GetRole
 };
 
 class BaseCommand {

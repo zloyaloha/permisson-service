@@ -1,5 +1,6 @@
 #pragma once
 #include <boost/asio.hpp>
+#include <QObject>
 #include "message.h"
 #include <string>
 #include "iostream"
@@ -11,14 +12,24 @@ namespace {
 
 using boost::asio::ip::tcp;
 
-class CommandHandler: public std::enable_shared_from_this<CommandHandler> {
+class CommandHandler: public QObject, public std::enable_shared_from_this<CommandHandler> {
+    Q_OBJECT 
     private:
         tcp::socket socket;
         boost::asio::io_context& io_context;
         boost::asio::streambuf responseBuffer;
+        boost::asio::streambuf responseBuffer2;
+        bool asyncReadingEnabled{false};
     public:
         CommandHandler(boost::asio::io_context& io_context);
         void Connect(const std::string &host, const std::string& port);
         void SendCommand(const Operation op, const std::initializer_list<std::string>& data);
         BaseCommand ReadResponse();
+        void StartAsyncReading();
+        void StopAsyncReading();
+        void AsyncReadResponse();
+    private:
+        void HandleMessage(const BaseCommand& command);
+    signals:
+        void GetRoleMessageReceived(const QString& response);
 };

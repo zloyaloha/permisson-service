@@ -71,18 +71,17 @@ void Worker::SendResponse(const Operation op, const std::initializer_list<std::s
         });
 }
 
-bool Worker::ValidateRequest(const int user_id, const std::string token) {
-    std::string userToken = GetToken(user_id); 
-    std::cout << userToken << '\n' << token << std::endl;
+bool Worker::ValidateRequest(const std::string& username, const std::string& token) {
+    std::string userToken = GetToken(username); 
     if (userToken == token) {
         return true;
     }
     return false;
 }
 
-std::string Worker::GetToken(const int user_id) {
+std::string Worker::GetToken(const std::string& username) {
     pqxx::work work(*_connection);
-    pqxx::result result = work.exec("SELECT permission_app.GetToken(" + work.quote(user_id) + ");");
+    pqxx::result result = work.exec("SELECT permission_app.GetToken(" + work.quote(username) + ");");
     work.commit();
     return GetStringQueryResult(result);
 }
@@ -90,7 +89,6 @@ std::string Worker::GetToken(const int user_id) {
 
 void Worker::ProccessOperation(const BaseCommand &command) {
     static std::string result;
-    std::pair<std::string, std::string> user_idAndToken;
     switch (command._op) {
         case Operation::Registrate:
             NotifyObservers("Registrate " + command._msg_data[0]);
@@ -99,12 +97,12 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             break;
         case Operation::Login:
             NotifyObservers("Log in " + command._msg_data[0]);
-            user_idAndToken = Login(command._msg_data[0], command._msg_data[1]); // login, password
-            SendResponse(command._op, {user_idAndToken.first, user_idAndToken.second});
+            result = Login(command._msg_data[0], command._msg_data[1]); // login, password
+            SendResponse(command._op, {result});
             break;
         case Operation::Quit:
-            NotifyObservers("Quit " + command._msg_data[1]);
-            if (!ValidateRequest(std::stoi(command._msg_data[0]), command._msg_data[1])) { // user_id, token
+            NotifyObservers("Quit " + command._msg_data[0]);
+            if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
                 NotifyObservers("Security warning");
                 break;
             }
@@ -112,7 +110,25 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             _connection->disconnect();
             break;
         case Operation::GetRole:
-            NotifyObservers("Get role " + command._msg_data[0]) // user_
+            NotifyObservers("Get role " + command._msg_data[0]); // username
+            if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
+                NotifyObservers("Security warning");
+                break;
+            }
+            std::string role = GetRole(command._msg_data[0]); //username
+            SendResponse(command._op, {role});
+    }
+}
+
+std::string Worker::GetRole(const std::string& role) {
+    pqxx::work work(*_connection);
+    pqxx::result result = work.exec("SELECT permission_app.UserRights(" + work.quote(role) + ");");
+    work.commit();
+    std::string admin = GetStringQueryResult(result);
+    if (admin == "t") {
+        return "admin";
+    } else {
+        return "common";
     }
 }
 
@@ -122,18 +138,18 @@ void Worker::Quit(const std::string& token) {
     work.commit();
 }
 
-std::pair<std::string, std::string> Worker::Login(const std::string& login, const std::string& password) {
+std::string Worker::Login(const std::string& login, const std::string& password) {
     int user_id = UserID(login);
     if (user_id == 0) {
-        return std::make_pair("Invalid username", "");
+        return "Invalid username";
     }
     std::pair<std::string, std::string> passwordAndSalt = GetSaltAndPassword(login);
     std::string hashedPassword = HashPassword(password, passwordAndSalt.second);
     if (hashedPassword != passwordAndSalt.first) {
-        return std::make_pair("Invalid password", "");
+        return "Invalid password";
     }
     std::string token = CreateSession(user_id);
-    return std::make_pair(std::to_string(user_id), token);
+    return token;
 }
 
 std::string Worker::Registrate(const std::string& login, const std::string& password) {

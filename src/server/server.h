@@ -61,12 +61,12 @@ class Worker : public std::enable_shared_from_this<Worker>, public Observable {
         void SendResponse(const Operation op, const std::initializer_list<std::string>& data);
         void ProccessOperation(const BaseCommand &command);
         std::string Registrate(const std::string& login, const std::string& password);
-        std::pair<std::string, std::string> Login(const std::string& login, const std::string& password);
+        std::string Login(const std::string& login, const std::string& password);
         void Quit(const std::string& token);
     private:
-        void QuitSession();
-        bool ValidateRequest(const int user_id, const std::string token);
-        std::string GetToken(const int user_id);
+        bool ValidateRequest(const std::string& username, const std::string& token);
+        std::string GetToken(const std::string& username);
+        std::string GetRole(const std::string& username);
         std::string CreateSession(const int user_id);
         std::string GenerateSalt(std::size_t size = 16) const; // bytes
         std::string HashPassword(const std::string& password, const std::string& salt) const;

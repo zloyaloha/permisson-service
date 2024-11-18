@@ -13,6 +13,46 @@ void CommandHandler::Connect(const std::string &host, const std::string& port) {
     }
 }
 
+void CommandHandler::StartAsyncReading() {
+    asyncReadingEnabled = true;
+    AsyncReadResponse();
+}
+
+void CommandHandler::StopAsyncReading() {
+    asyncReadingEnabled = false;
+}
+
+void CommandHandler::AsyncReadResponse() {
+    if (!asyncReadingEnabled) return; // Проверяем, включено ли чтение
+    std::shared_ptr<CommandHandler> self = shared_from_this();
+    boost::asio::async_read_until(socket, responseBuffer2, '\0',
+        [this, self](boost::system::error_code ec, std::size_t bytes_transferred) {
+            if (!ec && asyncReadingEnabled) {
+                std::cout << "In async2" << std::endl;
+                std::istream responseStream(&responseBuffer2);
+                std::string response;
+                std::getline(responseStream, response);
+                BaseCommand command(response);
+                HandleMessage(command);
+
+                AsyncReadResponse();
+            } else if (ec) {
+                std::cerr << "Error reading response: " << ec.message() << std::endl;
+            }
+        });
+}
+
+void CommandHandler::HandleMessage(const BaseCommand& command) {
+    switch (command._op)
+        {
+        case Operation::GetRole:
+            emit GetRoleMessageReceived(QString::fromStdString(command._msg_data[0]));
+            break;
+        default:
+            break;
+        }
+}
+
 void CommandHandler::SendCommand(const Operation op, const std::initializer_list<std::string>& data) {
     try {
         if (socket.is_open()) {
@@ -28,7 +68,7 @@ void CommandHandler::SendCommand(const Operation op, const std::initializer_list
 }
 
 BaseCommand CommandHandler::ReadResponse() {
- try {
+    try {
         boost::asio::streambuf responseBuffer;
 
         boost::asio::read_until(socket, responseBuffer, '\0');

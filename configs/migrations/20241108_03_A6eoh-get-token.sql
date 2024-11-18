@@ -15,11 +15,11 @@ BEGIN
     INTO user_token
     FROM permission_app.sessions
     WHERE 
-        user_id = (SELECT user_id) 
+        user_id = (SELECT user_id FROM permission_app.users WHERE login = username) 
         AND exit_at IS NULL;
 
     RETURN user_token;
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION permission_app.AddSession(INT) TO app_user;
+GRANT EXECUTE ON FUNCTION permission_app.GetToken(TEXT) TO app_user;
