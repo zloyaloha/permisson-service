@@ -39,7 +39,7 @@ private:
     std::shared_ptr<CommandHandler> _commandHandler;
     std::shared_ptr<StringHandler> _stringHandler;
     std::string _token;
-    int _user_id;
+    std::string _username;
 };
 
 class StringHandler {

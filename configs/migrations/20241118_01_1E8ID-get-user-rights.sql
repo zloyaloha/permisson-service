@@ -13,7 +13,6 @@ BEGIN
     INTO user_root
     FROM permission_app.users
     WHERE login = username
-    LIMIT 1;
 END;
 $$;
 

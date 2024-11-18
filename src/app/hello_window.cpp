@@ -20,7 +20,7 @@ HelloWindow::HelloWindow(QWidget *parent)
 }
 
 HelloWindow::~HelloWindow() {
-    _commandHandler->SendCommand(Operation::Quit, {std::to_string(_user_id), _token});
+    _commandHandler->SendCommand(Operation::Quit, {_username, _token});
 }
 
 void HelloWindow::ToRegistrationButtonClicked()

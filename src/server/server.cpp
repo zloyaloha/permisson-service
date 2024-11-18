@@ -111,6 +111,8 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             Quit(command._msg_data[1]); // user_id
             _connection->disconnect();
             break;
+        case Operation::GetRole:
+            NotifyObservers("Get role " + command._msg_data[0]) // user_
     }
 }
 
