@@ -40,7 +40,7 @@ public:
         std::ostringstream oss;
         oss << int(_op) << '\n' << _pid << '\n';
         if (_msg_data.size() == 0) {
-            return "";
+            return "\0";
         }
         for (int i = 0; i < _msg_data.size() - 1; i++) {
             oss << _msg_data[i] << '\n';

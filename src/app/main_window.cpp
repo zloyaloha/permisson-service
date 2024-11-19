@@ -10,7 +10,7 @@ MainWindow::MainWindow(std::shared_ptr<CommandHandler> commandor, QWidget *paren
 MainWindow::~MainWindow() {}
 
 void MainWindow::SetupWindow(const QString& username, const QString& token) {
-    // _commandHandler->StartAsyncReading();
+    _commandHandler->StartAsyncReading();
     _token = token.toStdString();
     _username = username.toStdString();
     ui->usernameLine->setText(username);
@@ -19,5 +19,6 @@ void MainWindow::SetupWindow(const QString& username, const QString& token) {
 }
 
 void MainWindow::onRoleMessageReceived(const QString& message) {
+    std::cout << "triggered" << std::endl;
     ui->roleLine->setText(message);
 }

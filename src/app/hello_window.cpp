@@ -2,7 +2,7 @@
 
 
 HelloWindow::HelloWindow(QWidget *parent)
-    : QMainWindow(parent), ui(new Ui::HelloWindow), _username(""), _token("")
+    : QMainWindow(parent), ui(new Ui::HelloWindow), _username(), _token()
 {
     ui->setupUi(this);
     QPixmap pic("../src/common/file.png");
@@ -15,12 +15,13 @@ HelloWindow::HelloWindow(QWidget *parent)
     connect(ui->registrationRegistrationButton, &QPushButton::clicked, this, &HelloWindow::RegistrationButtonClicked);
     connect(ui->backToLoginWindowButton, &QPushButton::clicked, this, &HelloWindow::BackToLoginWindowButtonClicked);
 
-    boost::asio::io_context io_context;
-    _commandHandler = std::make_shared<CommandHandler>(io_context);
+    static boost::asio::io_context io_context;
+    _commandHandler = std::make_shared<CommandHandler>(io_context, SERVER_ADDRESS, PORT);
     _stringHandler = std::make_shared<StringHandler>();
     ui->stackedWidget->setCurrentIndex(0);
-    _commandHandler->Connect(SERVER_ADDRESS, PORT);
+    _commandHandler->Connect();
     _mainWindow = std::make_shared<MainWindow>(_commandHandler);
+    std::thread([&]() { io_context.run(); }).detach();
 }
 
 HelloWindow::~HelloWindow() {
@@ -75,6 +76,7 @@ void HelloWindow::LoginButtonClicked()
     } else {
         std::cout << "Удачно зашел" << std::endl;
         _token = response._msg_data[0];
+        _username = login.toStdString();
         _mainWindow->SetupWindow(login, QString::fromStdString(_token));
     }
 }

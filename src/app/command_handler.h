@@ -1,5 +1,6 @@
 #pragma once
 #include <boost/asio.hpp>
+#include <boost/bind/bind.hpp>
 #include <QObject>
 #include "message.h"
 #include <string>
@@ -15,20 +16,22 @@ using boost::asio::ip::tcp;
 class CommandHandler: public QObject, public std::enable_shared_from_this<CommandHandler> {
     Q_OBJECT 
     private:
-        tcp::socket socket;
-        boost::asio::io_context& io_context;
+        tcp::socket _socket;
+        boost::asio::io_context& _io_context;
+        tcp::resolver _resolver;
         boost::asio::streambuf responseBuffer;
-        boost::asio::streambuf responseBuffer2;
         bool asyncReadingEnabled{false};
+        std::string _host, _port;
     public:
-        CommandHandler(boost::asio::io_context& io_context);
-        void Connect(const std::string &host, const std::string& port);
+        CommandHandler(boost::asio::io_context& io_context, const std::string& host, const std::string& port);
+        void Connect();
         void SendCommand(const Operation op, const std::initializer_list<std::string>& data);
         BaseCommand ReadResponse();
         void StartAsyncReading();
         void StopAsyncReading();
         void AsyncReadResponse();
     private:
+        void ConnectToServer(tcp::resolver::results_type& endpoints);
         void HandleMessage(const BaseCommand& command);
     signals:
         void GetRoleMessageReceived(const QString& response);

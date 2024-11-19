@@ -1,16 +1,33 @@
 #include "command_handler.h"
 
 
-CommandHandler::CommandHandler(boost::asio::io_context& io_context) : io_context(io_context), socket(io_context), responseBuffer() {}
+CommandHandler::CommandHandler(boost::asio::io_context& io_context, const std::string& host, const std::string& port) : 
+    _io_context(io_context), _socket(io_context), _host(host), _port(port), _resolver(io_context) {}
 
-void CommandHandler::Connect(const std::string &host, const std::string& port) {
-    try {
-        tcp::resolver resolver(io_context);
-        auto endpoints = resolver.resolve(host, port);
-        boost::asio::connect(socket, endpoints);
-    } catch (std::exception& e) {
-        std::cerr << "Error while connecting: " << e.what() << "\n";
-    }
+void CommandHandler::Connect() {
+    auto self = shared_from_this();
+    tcp::resolver::query query(_host, _port);
+    _resolver.async_resolve(query, 
+        [this, self](const boost::system::error_code& ec, tcp::resolver::results_type results) {
+            if (!ec) {
+                ConnectToServer(results);
+            } else {
+                std::cerr << "Error resolving: " << ec.message() << std::endl;
+            }
+        });
+}
+
+void CommandHandler::ConnectToServer(tcp::resolver::results_type& endpoints) {
+    auto self = shared_from_this();
+    boost::asio::async_connect(_socket, endpoints,
+        [this, self](const boost::system::error_code& ec, const tcp::endpoint& endpoint) {
+            if (!ec) {
+                std::cout << "Connected to " << endpoint << std::endl;
+                AsyncReadResponse();
+            } else {
+                std::cerr << "Error connecting: " << ec.message() << std::endl;
+            }
+        });
 }
 
 void CommandHandler::StartAsyncReading() {
@@ -23,55 +40,48 @@ void CommandHandler::StopAsyncReading() {
 }
 
 void CommandHandler::AsyncReadResponse() {
-    if (!asyncReadingEnabled) return; // Проверяем, включено ли чтение
-    std::shared_ptr<CommandHandler> self = shared_from_this();
-    boost::asio::async_read_until(socket, responseBuffer2, '\0',
+    auto self(shared_from_this());
+    boost::asio::async_read_until(_socket, responseBuffer, '\0',
         [this, self](boost::system::error_code ec, std::size_t bytes_transferred) {
-            if (!ec && asyncReadingEnabled) {
-                std::cout << "In async2" << std::endl;
-                std::istream responseStream(&responseBuffer2);
-                std::string response;
-                std::getline(responseStream, response);
-                BaseCommand command(response);
+            if (!ec) {
+                std::istream is(&responseBuffer);
+                std::string data;
+                std::getline(is, data, '\0');
+                BaseCommand command(data);
                 HandleMessage(command);
-
-                AsyncReadResponse();
-            } else if (ec) {
-                std::cerr << "Error reading response: " << ec.message() << std::endl;
+            } else {
+                boost::system::error_code ignored_ec;
+                _socket.close(ignored_ec);;
             }
-        });
+    });
 }
 
 void CommandHandler::HandleMessage(const BaseCommand& command) {
-    switch (command._op)
-        {
+    switch (command._op) {
         case Operation::GetRole:
             emit GetRoleMessageReceived(QString::fromStdString(command._msg_data[0]));
             break;
         default:
             break;
-        }
+    }
 }
 
 void CommandHandler::SendCommand(const Operation op, const std::initializer_list<std::string>& data) {
-    try {
-        if (socket.is_open()) {
-            BaseCommand msg(op, getpid(), data);
-            boost::asio::write(socket, boost::asio::buffer(msg.toPacket()));
-            std::cout << "Command sent: " << msg._op << std::endl;
-        } else {
-            std::cerr << "Socket is not open." << std::endl;
-        }
-    } catch (std::exception& e) {
-        std::cerr << "Error while sending command: " << e.what() << std::endl;
-    }
+    auto self(shared_from_this());
+    BaseCommand msg(op, getpid(), data);
+    boost::asio::async_write(_socket, boost::asio::buffer(msg.toPacket()),
+        [this, self](boost::system::error_code ec, std::size_t) {
+            if (ec) {
+                _socket.close();
+            }
+        });
 }
 
 BaseCommand CommandHandler::ReadResponse() {
     try {
         boost::asio::streambuf responseBuffer;
 
-        boost::asio::read_until(socket, responseBuffer, '\0');
+        boost::asio::read_until(_socket, responseBuffer, '\0');
 
         std::string response(boost::asio::buffer_cast<const char*>(responseBuffer.data()), responseBuffer.size());
 

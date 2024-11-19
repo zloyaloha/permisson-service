@@ -60,19 +60,21 @@ Worker::Worker(ThreadPool& threadPool, std::shared_ptr<tcp::socket> socket, std:
 void Worker::SendResponse(const Operation op, const std::initializer_list<std::string>& data) {
     auto self(shared_from_this());
     BaseCommand msg(op, getpid(), data);
+    std::cout << msg.toPacket().size() << std::endl;
     boost::asio::async_write(*_socket, boost::asio::buffer(msg.toPacket()),
-        [this, self](boost::system::error_code ec, std::size_t) {
+        [this, self](boost::system::error_code ec, std::size_t writed) {
             if (ec) {
                 NotifyObservers("Ошибка при отправке ответа " + ec.message());
                 _socket->close();
             } else {
-                NotifyObservers("Ответ отправлен");
+                NotifyObservers("Ответ отправлен " + std::to_string(writed));
             }
         });
 }
 
 bool Worker::ValidateRequest(const std::string& username, const std::string& token) {
-    std::string userToken = GetToken(username); 
+    std::string userToken = GetToken(username);
+    std::cout << userToken << '\n' << token << std::endl;
     if (userToken == token) {
         return true;
     }
@@ -115,7 +117,8 @@ void Worker::ProccessOperation(const BaseCommand &command) {
                 NotifyObservers("Security warning");
                 break;
             }
-            std::string role = GetRole(command._msg_data[0]); //username
+            sleep(1);
+            std::string role = GetRole(command._msg_data[0]); // username
             SendResponse(command._op, {role});
     }
 }
