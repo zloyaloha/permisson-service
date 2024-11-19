@@ -50,11 +50,9 @@ void HelloWindow::RegistrationButtonClicked()
     _commandHandler->SendCommand(Operation::Registrate, {login.toStdString(), password.toStdString()});
     BaseCommand response(_commandHandler->ReadResponse());
     if (response._msg_data[0] == "Success") {
-        ui->stackedWidget->setCurrentIndex(0);
+        QMessageBox::information(this, "Registration", "Success registration");
     } else if (response._msg_data[0] == "Exists") {
-        ui->loginRegistration->setReadOnly(true);
-        ui->loginRegistration->setText("Пользователь с таким именем уже существует");
-        ui->loginRegistration->setStyleSheet("QLineEdit { color: red; }");
+        QMessageBox::warning(this, "Registration", "User with this login is exist");
         ui->loginRegistration->setText("");
         ui->passwordRegistration->setText("");
     }
@@ -69,12 +67,12 @@ void HelloWindow::LoginButtonClicked()
     }
     _commandHandler->SendCommand(Operation::Login, {login.toStdString(), password.toStdString()});
     BaseCommand response(_commandHandler->ReadResponse());
-    if (response._msg_data[0] == "Not exists") {
-        std::cout << "Пользователя не существует" << std::endl;
+    if (response._msg_data[0] == "Invalid username") {
+        ui->statusbar->showMessage("User with this login isn't exist");
     } else if (response._msg_data[0] == "Invalid Password") {
-        std::cout << "Пароль неверный" << std::endl;
+        ui->statusbar->showMessage("Incorrect Password");
     } else {
-        std::cout << "Удачно зашел" << std::endl;
+        ui->statusbar->showMessage("Success login");
         _token = response._msg_data[0];
         _username = login.toStdString();
         _mainWindow->SetupWindow(login, QString::fromStdString(_token));
@@ -92,7 +90,6 @@ LoginAndPasswordValid StringHandler::IsValidLogin(const QString& login) {
 
 LoginAndPasswordValid StringHandler::IsValidPassword(const QString& password) {
     if (password.size() < MIN_PASSWORD_SIZE) {
-        std::cout << "???" << std::endl;
         return LoginAndPasswordValid::InvalidLen;
     }
     static QRegularExpression regex("^[a-zA-Z0-9@$!%*?&]+$");

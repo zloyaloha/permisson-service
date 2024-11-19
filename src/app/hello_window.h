@@ -2,6 +2,7 @@
 #include <QApplication>
 #include <QWidget>
 #include <QMainWindow>
+#include <QMessageBox>
 #include <QDebug>
 #include <QRegExp>
 #include <QRegularExpression>

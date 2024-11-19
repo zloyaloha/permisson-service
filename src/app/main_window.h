@@ -17,6 +17,8 @@ class MainWindow : public QMainWindow {
         void SetupWindow(const QString& username, const QString& token);
     private slots:
         void onRoleMessageReceived(const QString& role);
+    public slots:
+        void CreateFileButtonClicked();
     private:
         std::shared_ptr<CommandHandler> _commandHandler;
         Ui::MainWindow *ui;

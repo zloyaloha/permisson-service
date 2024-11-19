@@ -11,10 +11,13 @@ CREATE TABLE IF NOT EXISTs users (
 );
 
 CREATE TABLE IF NOT EXISTS groups (
-    group_id SERIAL PRIMARY KEY
+    group_id SERIAL PRIMARY KEY,
+    name VARCHAR(255) UNIQUE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS user_to_group (
     user_id INTEGER REFERENCES users(user_id),
-    group_id INTEGER REFERENCES groups(group_id)
+    group_id INTEGER REFERENCES groups(group_id),
+    UNIQUE(group_id, user_id)
 );

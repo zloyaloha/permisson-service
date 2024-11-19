@@ -49,6 +49,7 @@ void CommandHandler::AsyncReadResponse() {
                 std::getline(is, data, '\0');
                 BaseCommand command(data);
                 HandleMessage(command);
+                AsyncReadResponse();
             } else {
                 boost::system::error_code ignored_ec;
                 _socket.close(ignored_ec);;
@@ -60,6 +61,9 @@ void CommandHandler::HandleMessage(const BaseCommand& command) {
     switch (command._op) {
         case Operation::GetRole:
             emit GetRoleMessageReceived(QString::fromStdString(command._msg_data[0]));
+            break;
+        case Operation::CreateFile:
+            std::cout << "created" << std::endl;
             break;
         default:
             break;

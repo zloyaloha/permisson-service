@@ -12,7 +12,8 @@ enum Operation {
     Login,
     Registrate,
     Quit, 
-    GetRole
+    GetRole,
+    CreateFile
 };
 
 class BaseCommand {

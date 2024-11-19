@@ -62,6 +62,7 @@ class Worker : public std::enable_shared_from_this<Worker>, public Observable {
         void ProccessOperation(const BaseCommand &command);
         std::string Registrate(const std::string& login, const std::string& password);
         std::string Login(const std::string& login, const std::string& password);
+        std::string CreateFile(const std::string& username, const std::string& path, const std::string& filename);
         void Quit(const std::string& token);
     private:
         bool ValidateRequest(const std::string& username, const std::string& token);

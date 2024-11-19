@@ -36,7 +36,7 @@ void Session::ReadMessage() {
                 std::getline(is, data, '\0');
                 BaseCommand command(data);
                 if (command._op == Operation::Quit) {
-                    if (command._msg_data[0] != "0") { // logged connection
+                    if (command._msg_data[0] != "") { // logged connection
                         _worker->ProccessOperation(command);
                     }
                     _socket->close();
@@ -60,7 +60,6 @@ Worker::Worker(ThreadPool& threadPool, std::shared_ptr<tcp::socket> socket, std:
 void Worker::SendResponse(const Operation op, const std::initializer_list<std::string>& data) {
     auto self(shared_from_this());
     BaseCommand msg(op, getpid(), data);
-    std::cout << msg.toPacket().size() << std::endl;
     boost::asio::async_write(*_socket, boost::asio::buffer(msg.toPacket()),
         [this, self](boost::system::error_code ec, std::size_t writed) {
             if (ec) {
@@ -117,10 +116,26 @@ void Worker::ProccessOperation(const BaseCommand &command) {
                 NotifyObservers("Security warning");
                 break;
             }
-            sleep(1);
-            std::string role = GetRole(command._msg_data[0]); // username
-            SendResponse(command._op, {role});
+            result = GetRole(command._msg_data[0]); // username
+            SendResponse(command._op, {result});
+            break;
+        case Operation::CreateFile:
+            NotifyObservers("Create file " + command._msg_data[0]); // username
+            if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
+                NotifyObservers("Security warning");
+                break;
+            }
+            result = CreateFile(command._msg_data[0], command._msg_data[2], command._msg_data[3]); // username, path, filename
+            SendResponse(command._op, {result});
+            break;
     }
+}
+
+std::string Worker::CreateFile(const std::string& username, const std::string& path, const std::string& filename) {
+    pqxx::work work(*_connection);
+    pqxx::result result = work.exec("SELECT permission_app.AddFileToPath(" + work.quote(path) + ", " + work.quote(filename) + ", " + work.quote(username) + ");");
+    work.commit();
+    return GetStringQueryResult(result);
 }
 
 std::string Worker::GetRole(const std::string& role) {
