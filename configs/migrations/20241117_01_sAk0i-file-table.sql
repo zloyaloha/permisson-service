@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS permission_app.events (
     event_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-INSERT INTO permission_app.nodes (parent_id, name, type)
+INSERT INTO permission_app.nodes(parent_id, name, type)
 VALUES (NULL, 'root', 'DIR');
 
 GRANT SELECT, INSERT, DELETE, UPDATE ON permission_app.nodes TO app_user;

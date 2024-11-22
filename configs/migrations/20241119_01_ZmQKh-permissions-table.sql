@@ -12,5 +12,8 @@ CREATE TABLE IF NOT EXISTS permission_app.permissions (
     UNIQUE(node_id, user_id, group_id) -- Гарантирует уникальность комбинаций
 );
 
+INSERT INTO permission_app.permissions(node_id,can_read,can_write,can_execute)
+VALUES (1, TRUE, TRUE, TRUE);
+
 GRANT SELECT, INSERT, DELETE, UPDATE ON permission_app.permissions TO app_user;
 GRANT USAGE, SELECT ON SEQUENCE permission_app.permissions_permission_id_seq TO app_user;

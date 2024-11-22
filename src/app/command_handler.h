@@ -1,6 +1,7 @@
 #pragma once
 #include <boost/asio.hpp>
-#include <boost/bind/bind.hpp>
+#include <boost/bind.hpp>
+#include <boost/asio/buffer.hpp>
 #include <QObject>
 #include "message.h"
 #include <string>
@@ -20,6 +21,7 @@ class CommandHandler: public QObject, public std::enable_shared_from_this<Comman
         boost::asio::io_context& _io_context;
         tcp::resolver _resolver;
         boost::asio::streambuf responseBuffer;
+        std::string _buffer;
         bool asyncReadingEnabled{false};
         std::string _host, _port;
     public:
@@ -31,8 +33,10 @@ class CommandHandler: public QObject, public std::enable_shared_from_this<Comman
         void StopAsyncReading();
         void AsyncReadResponse();
     private:
+        void handle_read(const boost::system::error_code& error);
         void ConnectToServer(tcp::resolver::results_type& endpoints);
         void HandleMessage(const BaseCommand& command);
     signals:
         void GetRoleMessageReceived(const QString& response);
+        void UpdateFileList(const QString& response);
 };

@@ -41,12 +41,13 @@ void CommandHandler::StopAsyncReading() {
 
 void CommandHandler::AsyncReadResponse() {
     auto self(shared_from_this());
-    boost::asio::async_read_until(_socket, responseBuffer, '\0',
+    boost::asio::async_read_until(_socket, responseBuffer, TERMINATING_STRING,
         [this, self](boost::system::error_code ec, std::size_t bytes_transferred) {
             if (!ec) {
                 std::istream is(&responseBuffer);
                 std::string data;
-                std::getline(is, data, '\0');
+                std::getline(is, data, '\r');
+                responseBuffer.consume(bytes_transferred);
                 BaseCommand command(data);
                 HandleMessage(command);
                 AsyncReadResponse();
@@ -64,6 +65,9 @@ void CommandHandler::HandleMessage(const BaseCommand& command) {
             break;
         case Operation::CreateFile:
             std::cout << "created" << std::endl;
+            break;
+        case Operation::GetFileList:
+            emit UpdateFileList(QString::fromStdString(command._msg_data[0])); // json
             break;
         default:
             break;
@@ -85,19 +89,15 @@ BaseCommand CommandHandler::ReadResponse() {
     try {
         boost::asio::streambuf responseBuffer;
 
-        boost::asio::read_until(_socket, responseBuffer, '\0');
-
+        boost::asio::read_until(_socket, responseBuffer, TERMINATING_STRING);
+        
         std::string response(boost::asio::buffer_cast<const char*>(responseBuffer.data()), responseBuffer.size());
-
-        if (!response.empty() && response.back() == '\0') {
-            response.pop_back();
-        }
 
         BaseCommand command(response);
 
         std::cout << "Ответ получен: " << response << std::endl;
 
-        responseBuffer.consume(responseBuffer.size());
+        responseBuffer.consume(response.size());
         
         return command;
     } catch (std::exception& e) {

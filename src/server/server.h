@@ -1,3 +1,4 @@
+#pragma once
 #include <iostream>
 #include <vector>
 #include <boost/asio.hpp>
@@ -9,6 +10,17 @@
 #include <iomanip>
 #include <openssl/sha.h>
 #include <openssl/rand.h>
+#include <tuple>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/json_parser.hpp>
+#include <sstream>
+#include <boost/foreach.hpp>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QString>
+#include <QStringList>
+#include <QDebug>
 
 #include "thread_pool.h"
 #include "message.h"
@@ -34,6 +46,17 @@ namespace {
         " user=" + DB_USER + 
         " password=" + DB_PASSWORD; 
 }
+
+class FileTreeHandler {
+public:
+    FileTreeHandler() = default;
+
+    QJsonObject generateFileTree(const pqxx::result& result);
+private:
+    void addFileToTree(QJsonArray& parentArray, const QStringList& pathComponents, 
+                       const QString& name, const QString& type, const QString& path, 
+                       bool canRead, bool canWrite);
+};
 
 class Observable {
 public:
@@ -63,6 +86,7 @@ class Worker : public std::enable_shared_from_this<Worker>, public Observable {
         std::string Registrate(const std::string& login, const std::string& password);
         std::string Login(const std::string& login, const std::string& password);
         std::string CreateFile(const std::string& username, const std::string& path, const std::string& filename);
+        std::string GetFileList();
         void Quit(const std::string& token);
     private:
         bool ValidateRequest(const std::string& username, const std::string& token);
@@ -78,7 +102,7 @@ class Worker : public std::enable_shared_from_this<Worker>, public Observable {
         std::string GetStringQueryResult(const pqxx::result& result) const;
         std::pair<std::string, std::string> GetPairQueryResult(const pqxx::result& result) const;
     private:
-    
+        FileTreeHandler _treeHandler;
         ThreadPool& _threadPool;
         std::unique_ptr<pqxx::connection> _connection;
         std::shared_ptr<tcp::socket> _socket;
@@ -114,3 +138,5 @@ class ServerTerminalObserver : public IServerObserver {
     public:
         void Notify(const std::tm* time, const std::string& str) override;
 };
+
+

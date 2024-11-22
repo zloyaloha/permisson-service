@@ -26,7 +26,7 @@
     <property name="title">
      <string>GroupBox</string>
     </property>
-    <widget class="QWidget" name="">
+    <widget class="QWidget" name="layoutWidget">
      <property name="geometry">
       <rect>
        <x>20</x>
@@ -67,7 +67,7 @@
      </layout>
     </widget>
    </widget>
-   <widget class="QWidget" name="">
+   <widget class="QWidget" name="layoutWidget">
     <property name="geometry">
      <rect>
       <x>50</x>
@@ -78,42 +78,43 @@
     </property>
     <layout class="QVBoxLayout" name="fileListLayout">
      <item>
-      <layout class="QVBoxLayout" name="infoLabels"/>
-     </item>
-     <item>
-      <layout class="QFormLayout" name="labelsLayout">
-       <item row="0" column="0">
-        <widget class="QLabel" name="usernameLabel">
-         <property name="text">
-          <string>Пользователь</string>
-         </property>
-        </widget>
+      <layout class="QVBoxLayout" name="infoLabels">
+       <item>
+        <layout class="QFormLayout" name="labelsLayout">
+         <item row="0" column="0">
+          <widget class="QLabel" name="usernameLabel">
+           <property name="text">
+            <string>Пользователь</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="0">
+          <widget class="QLabel" name="roleLabel">
+           <property name="text">
+            <string>Роль</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QLineEdit" name="usernameLine">
+           <property name="readOnly">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="1">
+          <widget class="QLineEdit" name="roleLine">
+           <property name="readOnly">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+        </layout>
        </item>
-       <item row="1" column="0">
-        <widget class="QLabel" name="roleLabel">
-         <property name="text">
-          <string>Роль</string>
-         </property>
-        </widget>
-       </item>
-       <item row="0" column="1">
-        <widget class="QLineEdit" name="usernameLine">
-         <property name="readOnly">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="1">
-        <widget class="QLineEdit" name="roleLine">
-         <property name="readOnly">
-          <bool>true</bool>
-         </property>
-        </widget>
+       <item>
+        <widget class="QTreeView" name="listTree"/>
        </item>
       </layout>
-     </item>
-     <item>
-      <widget class="QListView" name="filesList"/>
      </item>
     </layout>
    </widget>
@@ -124,7 +125,7 @@
      <x>0</x>
      <y>0</y>
      <width>964</width>
-     <height>26</height>
+     <height>20</height>
     </rect>
    </property>
   </widget>

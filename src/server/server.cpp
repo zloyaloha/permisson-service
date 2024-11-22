@@ -28,23 +28,38 @@ void Session::Start() {
 
 void Session::ReadMessage() {
     auto self(shared_from_this());
-    boost::asio::async_read_until(*_socket, _buffer, '\0',
+    boost::asio::async_read_until(*_socket, _buffer, TERMINATING_STRING,
         [this, self](boost::system::error_code ec, std::size_t bytes_transferred) {
             if (!ec) {
-                std::istream is(&_buffer);
-                std::string data;
-                std::getline(is, data, '\0');
-                BaseCommand command(data);
-                if (command._op == Operation::Quit) {
-                    if (command._msg_data[0] != "") { // logged connection
-                        _worker->ProccessOperation(command);
+                std::istream is(&_buffer); // Создаем поток для работы с buffer
+                std::string result;
+                std::string temp;
+                size_t pos;
+                bool flag = 0;
+                while (std::getline(is, temp)) {
+                    result += temp + '\n';
+                    std::cout << "data: " << temp << std::endl;
+                    pos = result.find(TERMINATING_STRING);
+                    if (pos != std::string::npos) {
+                        std::string data = result.substr(0, pos);
+                        std::cout << "AAAAAAAAA" << std::endl << bytes_transferred << std::endl;
+                        BaseCommand command(data);
+                        flag = 1;
+                        if (command._op == Operation::Quit) {
+                            if (command._msg_data[0] != "") { // logged connection
+                                _worker->ProccessOperation(command);
+                            }
+                            _socket->close();
+                            return;
+                        }
+                        NotifyObservers("Сообщение получено\n" + data);
+                        _threadPool.EnqueueTask([this, command] { _worker->ProccessOperation(command); });
+                        ReadMessage();
                     }
-                    _socket->close();
-                    return;
                 }
-                NotifyObservers("Сообщение получено\n" + data);
-                _threadPool.EnqueueTask([this, command] { _worker->ProccessOperation(command); });
-                ReadMessage();
+                if (!flag) {
+                    std::cout << "not full read" << std::endl;
+                }
             } else {
                 NotifyObservers("Ошибка при получении сообщения " + ec.message());
                 boost::system::error_code ignored_ec;
@@ -60,6 +75,11 @@ Worker::Worker(ThreadPool& threadPool, std::shared_ptr<tcp::socket> socket, std:
 void Worker::SendResponse(const Operation op, const std::initializer_list<std::string>& data) {
     auto self(shared_from_this());
     BaseCommand msg(op, getpid(), data);
+    std::string abc = msg.toPacket();
+    for (auto byte: abc) {
+        std::cout << byte << ' ';
+    }
+    std::cout << std::endl;
     boost::asio::async_write(*_socket, boost::asio::buffer(msg.toPacket()),
         [this, self](boost::system::error_code ec, std::size_t writed) {
             if (ec) {
@@ -73,6 +93,7 @@ void Worker::SendResponse(const Operation op, const std::initializer_list<std::s
 
 bool Worker::ValidateRequest(const std::string& username, const std::string& token) {
     std::string userToken = GetToken(username);
+    std::cout << userToken.size() << ' ' << token.size() << std::endl;
     std::cout << userToken << '\n' << token << std::endl;
     if (userToken == token) {
         return true;
@@ -128,7 +149,26 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             result = CreateFile(command._msg_data[0], command._msg_data[2], command._msg_data[3]); // username, path, filename
             SendResponse(command._op, {result});
             break;
+        case Operation::GetFileList:
+            NotifyObservers("GetFileList file " + command._msg_data[0]); // username
+            if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
+                NotifyObservers("Security warning");
+                break;
+            }
+            result = GetFileList();
+            SendResponse(command._op, {result});
+            break;
     }
+}
+
+std::string Worker::GetFileList() {
+    pqxx::work work(*_connection);
+    pqxx::result result = work.exec("SELECT * FROM permission_app.GetFileTreeWithPermissions();");
+    work.commit();
+    QJsonObject jsonTree = _treeHandler.generateFileTree(result);
+    QJsonDocument doc(jsonTree);
+    std::cout << doc.toJson().toStdString() << std::endl;
+    return doc.toJson(QJsonDocument::Compact).toStdString();
 }
 
 std::string Worker::CreateFile(const std::string& username, const std::string& path, const std::string& filename) {
@@ -286,4 +326,67 @@ void ServerTextObserver::Notify(const std::tm* time, const std::string& str) {
 
 void ServerTerminalObserver::Notify(const std::tm* time, const std::string& str) {
     std::cout << std::put_time(time, "%d-%m-%Y %H:%M:%S") << '\t' << str << std::endl;
+}
+
+ QJsonObject FileTreeHandler::generateFileTree(const pqxx::result& result) {
+        QJsonObject root;
+        QJsonArray fileSystem;
+
+        for (const auto& row : result) {
+            QString path = QString::fromStdString(row["path"].c_str());
+            QStringList pathComponents = path.split('/');
+            QString fileName = QString::fromStdString(row["name"].c_str());
+            QString fileType = QString::fromStdString(row["type"].c_str());
+            bool canRead = row["can_read"].as<bool>();
+            bool canWrite = row["can_write"].as<bool>();
+
+            addFileToTree(fileSystem, pathComponents, fileName, fileType, path, canRead, canWrite);
+        }
+
+        root["file_system"] = fileSystem;
+        return root;
+    }
+
+void FileTreeHandler::addFileToTree(QJsonArray& parentArray, const QStringList& pathComponents, 
+                       const QString& name, const QString& type, const QString& path, 
+                       bool canRead, bool canWrite) {
+
+    if (pathComponents.isEmpty()) {
+        return;
+    }
+
+    QString currentComponent = pathComponents.first();
+    QJsonObject currentNode;
+
+    // Поиск существующего узла
+    bool nodeFound = false;
+    for (int i = 0; i < parentArray.size(); ++i) {
+        QJsonObject obj = parentArray[i].toObject();
+        if (obj["name"].toString() == currentComponent) {
+            currentNode = obj;
+            nodeFound = true;
+            parentArray.removeAt(i); // Удаляем объект для обновления
+            break;
+        }
+    }
+
+    // Если узел не найден, создаем новый
+    if (!nodeFound) {
+        currentNode["name"] = currentComponent;
+        currentNode["type"] = type;
+        currentNode["path"] = path;
+        currentNode["can_read"] = canRead ? "t" : "f";
+        currentNode["can_write"] = canWrite ? "t" : "f";
+        currentNode["files"] = QJsonArray();
+    }
+
+    // Если есть оставшиеся компоненты пути, рекурсивно создаем вложенные узлы
+    if (pathComponents.size() > 1) {
+        QJsonArray filesArray = currentNode["files"].toArray();
+        addFileToTree(filesArray, pathComponents.mid(1), name, type, path, canRead, canWrite);
+        currentNode["files"] = filesArray;
+    }
+
+    // Возвращаем обновленный узел в массив
+    parentArray.append(currentNode);
 }

@@ -1,0 +1,37 @@
+{
+    "file_system": [
+    {
+        "name": "root",
+        "type": "DIR",
+        "path": "root",
+        "can_read": "t",
+        "can_write": "t",
+        "files": [
+            {
+            "name": "dir1",
+            "type": "DIR",
+            "path": "root/dir1",
+            "can_read": "f",
+            "can_write": "f",
+            "files": [
+                {
+                    "name": "file1",
+                    "type": "FILE",
+                    "path": "root/dir1/file1",
+                    "can_read": "f",
+                    "can_write": "f"
+                }
+            ]
+            },
+            {
+                "name": "dir2",
+                "type": "DIR",
+                "path": "root/dir2",
+                "can_read": "f",
+                "can_write": "f",
+                "files": []
+            }
+        ]
+    }
+    ]
+}

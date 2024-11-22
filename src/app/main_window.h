@@ -8,6 +8,27 @@
 #include <QRegExp>
 #include <QRegularExpression>
 #include <QPixmap>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QStandardItemModel>
+#include <QTreeView>
+
+class JsonTreeHandler {
+public:
+    JsonTreeHandler();
+    ~JsonTreeHandler();
+
+    // Метод для загрузки JSON в QTreeView
+    void loadJsonToTreeView(QTreeView* treeView, const QJsonDocument& jsonDocument);
+
+private:
+    QStandardItemModel* model;
+
+    // Рекурсивная функция для заполнения модели данными из JSON
+    void populateTree(QStandardItem* parentItem, const QJsonObject& jsonObject);
+    void populateArray(QStandardItem* parentItem, const QJsonArray& jsonArray);
+};
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -16,12 +37,14 @@ class MainWindow : public QMainWindow {
         ~MainWindow();
         void SetupWindow(const QString& username, const QString& token);
     private slots:
-        void onRoleMessageReceived(const QString& role);
+        void OnRoleMessageReceived(const QString& role);
+        void OnUpdateFileList(const QString& role);
     public slots:
         void CreateFileButtonClicked();
     private:
         std::shared_ptr<CommandHandler> _commandHandler;
+        std::shared_ptr<JsonTreeHandler> _treeHandler;
         Ui::MainWindow *ui;
         std::string _username;
-        std::string _token;    
+        std::string _token;
 };

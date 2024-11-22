@@ -6,6 +6,7 @@
 
 namespace {
     const int BUFFER_SIZE = 65665;
+    const std::string TERMINATING_STRING = "\r\0\r\0";
 }
 
 enum Operation {
@@ -13,7 +14,8 @@ enum Operation {
     Registrate,
     Quit, 
     GetRole,
-    CreateFile
+    CreateFile,
+    GetFileList
 };
 
 class BaseCommand {
@@ -39,14 +41,22 @@ public:
 
     std::string toPacket() {
         std::ostringstream oss;
-        oss << int(_op) << '\n' << _pid << '\n';
+        oss << std::to_string(int(_op)) << '\n' << std::to_string(_pid) << '\n';
         if (_msg_data.size() == 0) {
-            return "\0";
+            return TERMINATING_STRING;
         }
         for (int i = 0; i < _msg_data.size() - 1; i++) {
             oss << _msg_data[i] << '\n';
         }
-        oss << _msg_data[_msg_data.size() - 1] << '\0';
+        oss << _msg_data[_msg_data.size() - 1] << TERMINATING_STRING;
         return oss.str();
+    }
+
+    std::string MakeJson() const {
+        std::string json = "";
+        for (const std::string& row: _msg_data) {
+            json += row;
+        }
+        return json;
     }
 };
