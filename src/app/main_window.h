@@ -20,14 +20,13 @@ public:
     ~JsonTreeHandler();
 
     // Метод для загрузки JSON в QTreeView
-    void loadJsonToTreeView(QTreeView* treeView, const QJsonDocument& jsonDocument);
+    void LoadJsonToTreeView(QTreeView* treeView, const QJsonDocument& jsonDocument);
 
 private:
     QStandardItemModel* model;
 
     // Рекурсивная функция для заполнения модели данными из JSON
-    void populateTree(QStandardItem* parentItem, const QJsonObject& jsonObject);
-    void populateArray(QStandardItem* parentItem, const QJsonArray& jsonArray);
+    void PopulateTree(QStandardItem* parentItem, const QJsonObject& jsonObject);
 };
 
 class MainWindow : public QMainWindow {
@@ -40,7 +39,9 @@ class MainWindow : public QMainWindow {
         void OnRoleMessageReceived(const QString& role);
         void OnUpdateFileList(const QString& role);
     public slots:
+        void NeedUpdateFileList();
         void CreateFileButtonClicked();
+        void ShowContextMenu(QPoint);
     private:
         std::shared_ptr<CommandHandler> _commandHandler;
         std::shared_ptr<JsonTreeHandler> _treeHandler;

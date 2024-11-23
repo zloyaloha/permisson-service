@@ -48,8 +48,12 @@ void CommandHandler::AsyncReadResponse() {
                 std::string data;
                 std::getline(is, data, '\r');
                 responseBuffer.consume(bytes_transferred);
-                BaseCommand command(data);
-                HandleMessage(command);
+                try {
+                    BaseCommand command(data);
+                    HandleMessage(command);
+                } catch (...) {
+                    std::cout << "Some problems with packet" << std::endl;
+                }
                 AsyncReadResponse();
             } else {
                 boost::system::error_code ignored_ec;

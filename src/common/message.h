@@ -6,7 +6,7 @@
 
 namespace {
     const int BUFFER_SIZE = 65665;
-    const std::string TERMINATING_STRING = "\r\0\r\0";
+    const std::string TERMINATING_STRING = "\0\r\0\r";
 }
 
 enum Operation {

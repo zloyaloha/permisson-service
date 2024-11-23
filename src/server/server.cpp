@@ -31,34 +31,24 @@ void Session::ReadMessage() {
     boost::asio::async_read_until(*_socket, _buffer, TERMINATING_STRING,
         [this, self](boost::system::error_code ec, std::size_t bytes_transferred) {
             if (!ec) {
-                std::istream is(&_buffer); // Создаем поток для работы с buffer
-                std::string result;
-                std::string temp;
-                size_t pos;
-                bool flag = 0;
-                while (std::getline(is, temp)) {
-                    result += temp + '\n';
-                    std::cout << "data: " << temp << std::endl;
-                    pos = result.find(TERMINATING_STRING);
-                    if (pos != std::string::npos) {
-                        std::string data = result.substr(0, pos);
-                        std::cout << "AAAAAAAAA" << std::endl << bytes_transferred << std::endl;
-                        BaseCommand command(data);
-                        flag = 1;
-                        if (command._op == Operation::Quit) {
-                            if (command._msg_data[0] != "") { // logged connection
-                                _worker->ProccessOperation(command);
-                            }
-                            _socket->close();
-                            return;
+                std::istream is(&_buffer);
+                std::string data;
+                std::getline(is, data, '\r');
+                _buffer.consume(bytes_transferred);
+                try {
+                    BaseCommand command(data);
+                    if (command._op == Operation::Quit) {
+                        if (command._msg_data[0] != "") { // logged connection
+                            _worker->ProccessOperation(command);
                         }
-                        NotifyObservers("Сообщение получено\n" + data);
-                        _threadPool.EnqueueTask([this, command] { _worker->ProccessOperation(command); });
-                        ReadMessage();
+                        _socket->close();
+                        return;
                     }
-                }
-                if (!flag) {
-                    std::cout << "not full read" << std::endl;
+                    NotifyObservers("Сообщение получено\n" + data);
+                    _threadPool.EnqueueTask([this, command] { _worker->ProccessOperation(command); });
+                    ReadMessage();
+                } catch (...) {
+                    std::cout << "Some problems with packet" << std::endl;
                 }
             } else {
                 NotifyObservers("Ошибка при получении сообщения " + ec.message());
@@ -141,7 +131,7 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             SendResponse(command._op, {result});
             break;
         case Operation::CreateFile:
-            NotifyObservers("Create file " + command._msg_data[0]); // username
+            NotifyObservers("Create file " + command._msg_data[0] + ' ' + command._msg_data[2] + ' ' + command._msg_data[3]); // username
             if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
                 NotifyObservers("Security warning");
                 break;
@@ -333,23 +323,25 @@ void ServerTerminalObserver::Notify(const std::tm* time, const std::string& str)
         QJsonArray fileSystem;
 
         for (const auto& row : result) {
-            QString path = QString::fromStdString(row["path"].c_str());
-            QStringList pathComponents = path.split('/');
-            QString fileName = QString::fromStdString(row["name"].c_str());
-            QString fileType = QString::fromStdString(row["type"].c_str());
-            bool canRead = row["can_read"].as<bool>();
-            bool canWrite = row["can_write"].as<bool>();
+            FileInfo file;
+            file.path = QString::fromStdString(row["path"].c_str());
+            QStringList pathComponents = file.path.split('/');
+            file.fileName = QString::fromStdString(row["name"].c_str());
+            file.fileType = QString::fromStdString(row["type"].c_str());
+            file.userName = QString::fromStdString(row["owner_name"].c_str());
+            file.groupName = QString::fromStdString(row["group_name"].c_str());
+            file.canRead = row["can_read"].as<bool>();
+            file.canWrite = row["can_write"].as<bool>();
+            file.canExec = row["can_exec"].as<bool>();
 
-            addFileToTree(fileSystem, pathComponents, fileName, fileType, path, canRead, canWrite);
+            addFileToTree(fileSystem, pathComponents, file);
         }
 
         root["file_system"] = fileSystem;
         return root;
     }
 
-void FileTreeHandler::addFileToTree(QJsonArray& parentArray, const QStringList& pathComponents, 
-                       const QString& name, const QString& type, const QString& path, 
-                       bool canRead, bool canWrite) {
+void FileTreeHandler::addFileToTree(QJsonArray& parentArray, const QStringList& pathComponents, const FileInfo& file) {
 
     if (pathComponents.isEmpty()) {
         return;
@@ -373,17 +365,18 @@ void FileTreeHandler::addFileToTree(QJsonArray& parentArray, const QStringList& 
     // Если узел не найден, создаем новый
     if (!nodeFound) {
         currentNode["name"] = currentComponent;
-        currentNode["type"] = type;
-        currentNode["path"] = path;
-        currentNode["can_read"] = canRead ? "t" : "f";
-        currentNode["can_write"] = canWrite ? "t" : "f";
+        currentNode["type"] = file.fileType;
+        currentNode["path"] = file.path;
+        currentNode["can_read"] = file.canRead ? "t" : "f";
+        currentNode["can_write"] = file.canWrite ? "t" : "f";
+        currentNode["can_exec"] = file.canExec ? "t" : "F";
         currentNode["files"] = QJsonArray();
     }
 
     // Если есть оставшиеся компоненты пути, рекурсивно создаем вложенные узлы
     if (pathComponents.size() > 1) {
         QJsonArray filesArray = currentNode["files"].toArray();
-        addFileToTree(filesArray, pathComponents.mid(1), name, type, path, canRead, canWrite);
+        addFileToTree(filesArray, pathComponents.mid(1), file);
         currentNode["files"] = filesArray;
     }
 

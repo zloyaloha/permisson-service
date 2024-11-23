@@ -4,7 +4,6 @@
 CREATE TYPE event_type AS ENUM ('READ', 'WRITE', 'DELETE', 'CHANGE_PERMISSION', 'CREATE_FILE');
 CREATE TYPE file_type AS ENUM ('FILE', 'DIR');
 
-
 CREATE TABLE IF NOT EXISTS permission_app.nodes (
     file_id SERIAL PRIMARY KEY,
     parent_id INT REFERENCES permission_app.nodes(file_id) ON DELETE CASCADE,

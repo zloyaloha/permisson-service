@@ -17,7 +17,6 @@ pkg_check_modules(PQ REQUIRED libpq)
 
 include_directories(${Boost_INCLUDE_DIRS})
 include_directories(${PQXX_INCLUDE_DIRS} ${PQ_INCLUDE_DIRS})
-include_directories(${Qt5Core_INCLUDE_DIRS})
 
 set(CMAKE_CXX_STANDARD 17)
 

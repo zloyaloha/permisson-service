@@ -4,9 +4,11 @@ MainWindow::MainWindow(std::shared_ptr<CommandHandler> commandor, QWidget *paren
     : QMainWindow(parent), ui(new Ui::MainWindow), _commandHandler(commandor), _treeHandler(std::make_shared<JsonTreeHandler>())
 {
     ui->setupUi(this);
+    ui->listTree->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(_commandHandler.get(), &CommandHandler::GetRoleMessageReceived, this, &MainWindow::OnRoleMessageReceived);
     connect(_commandHandler.get(), &CommandHandler::UpdateFileList, this, &MainWindow::OnUpdateFileList);
     connect(ui->createFileButton, &QPushButton::clicked, this, &MainWindow::CreateFileButtonClicked);
+    connect(ui->listTree, SIGNAL(customContextMenuRequested(QPoint)), SLOT(ShowContextMenu(QPoint)));
 }
 
 MainWindow::~MainWindow() {
@@ -50,30 +52,29 @@ void MainWindow::OnUpdateFileList(const QString& message) {
         qWarning("Failed to parse JSON.");
         return ;
     }
-    _treeHandler->loadJsonToTreeView(ui->listTree, jsonDocument);
+    _treeHandler->LoadJsonToTreeView(ui->listTree, jsonDocument);
 }
 
-void JsonTreeHandler::loadJsonToTreeView(QTreeView* treeView, const QJsonDocument& jsonDocument) {
+void JsonTreeHandler::LoadJsonToTreeView(QTreeView* treeView, const QJsonDocument& jsonDocument) {
     if (model) {
         delete model;
     }
 
     model = new QStandardItemModel(treeView);
-    model->setHorizontalHeaderLabels({"Name", "Type", "Can Read", "Can Write"});  // Заголовки для каждой колонки
+    model->setHorizontalHeaderLabels({"Name", "Type", "Can Read", "Can Write", "Can Execute"});
+    // model->setFlags(model->flags() & ~Qt::ItemIsEditable); // Запрещает редактирование всей модели
 
     QStandardItem* rootItem = model->invisibleRootItem();
 
-    // Проверяем, что jsonDocument является объектом
     if (jsonDocument.isObject()) {
         QJsonObject rootObject = jsonDocument.object();
         QJsonValue fileSystemValue = rootObject.value("file_system");
 
-        // Если "file_system" - это массив
         if (fileSystemValue.isArray()) {
             QJsonArray fileSystemArray = fileSystemValue.toArray();
             for (const QJsonValue& file : fileSystemArray) {
                 if (file.isObject()) {
-                    populateTree(rootItem, file.toObject());  // Обрабатываем каждый элемент в массиве "file_system"
+                    PopulateTree(rootItem, file.toObject());
                 }
             }
         }
@@ -83,55 +84,56 @@ void JsonTreeHandler::loadJsonToTreeView(QTreeView* treeView, const QJsonDocumen
     treeView->expandAll();
 }
 
-void JsonTreeHandler::populateTree(QStandardItem* parentItem, const QJsonObject& jsonObject) {
-    // Проверяем наличие параметров, таких как "name", "type", "can_read", "can_write"
+void JsonTreeHandler::PopulateTree(QStandardItem* parentItem, const QJsonObject& jsonObject) {
     QJsonValue nameValue = jsonObject.value("name");
     QJsonValue typeValue = jsonObject.value("type");
     QJsonValue canReadValue = jsonObject.value("can_read");
     QJsonValue canWriteValue = jsonObject.value("can_write");
+    QJsonValue canExecValue = jsonObject.value("can_exec");
 
-    // Если все параметры есть, добавляем их в одну строку
-    if (nameValue.isString() && typeValue.isString() && canReadValue.isString() && canWriteValue.isString()) {
-        QStandardItem* nameItem = new QStandardItem(nameValue.toString());
-        QStandardItem* typeItem = new QStandardItem(typeValue.toString());
-        QStandardItem* canReadItem = new QStandardItem(canReadValue.toString());
-        QStandardItem* canWriteItem = new QStandardItem(canWriteValue.toString());
+    QStandardItem* nameItem = new QStandardItem(nameValue.toString());
+    QStandardItem* typeItem = new QStandardItem(typeValue.toString());
+    QStandardItem* canReadItem = new QStandardItem(canReadValue.toString());
+    QStandardItem* canWriteItem = new QStandardItem(canWriteValue.toString());
+    QStandardItem* canExecItem = new QStandardItem(canExecValue.toString());
 
-        // Если это директория, добавляем ее как узел
-        if (typeValue.toString() == "DIR") {
-            QStandardItem* folderItem = new QStandardItem(nameValue.toString());
-            folderItem->setData("DIR", Qt::UserRole);  // Отметим, что это директория
-            parentItem->appendRow({folderItem, typeItem, canReadItem, canWriteItem});  // Добавляем как дочерний элемент родителя
+    QIcon folderIcon(":/icons/folder.png");
+    QIcon fileIcon(":/icons/file.png");
 
-            // Рекурсивно добавляем вложенные файлы и каталоги
-            QJsonValue filesValue = jsonObject.value("files");
-            if (filesValue.isArray()) {
-                QJsonArray filesArray = filesValue.toArray();
-                for (const QJsonValue& file : filesArray) {
-                    if (file.isObject()) {
-                        // Добавляем файл в текущую директорию
-                        populateTree(folderItem, file.toObject());
-                    }
+    if (typeValue.toString() == "DIR") {
+        QStandardItem* folderItem = new QStandardItem(nameValue.toString());
+        folderItem->setData("DIR", Qt::UserRole);
+        folderItem->setIcon(folderIcon);
+        parentItem->appendRow({folderItem, typeItem, canReadItem, canWriteItem, canExecItem});
+
+        QJsonValue filesValue = jsonObject.value("files");
+        if (filesValue.isArray()) {
+            QJsonArray filesArray = filesValue.toArray();
+            for (const QJsonValue& file : filesArray) {
+                if (file.isObject()) {
+                    PopulateTree(folderItem, file.toObject());
                 }
             }
-        } else if (typeValue.toString() == "FILE") {
-            // Если это файл, добавляем его как лист
-            parentItem->appendRow({nameItem, typeItem, canReadItem, canWriteItem});  // Добавляем как дочерний элемент родителя
         }
+    } else if (typeValue.toString() == "FILE") {
+        nameItem->setIcon(fileIcon);
+        parentItem->appendRow({nameItem, typeItem, canReadItem, canWriteItem, canExecItem});
     }
 }
 
-void JsonTreeHandler::populateArray(QStandardItem* parentItem, const QJsonArray& jsonArray) {
-    for (const auto& value : jsonArray) {
-        QStandardItem* arrayItem = new QStandardItem(value.toString());
-        parentItem->appendRow(arrayItem);
+void MainWindow::ShowContextMenu(QPoint pos) {
+    QMenu* menu = new QMenu(this);
+    QAction* updateFiles = new QAction(tr("Обновить"), this);
+    // /* Подключаем СЛОТы обработчики для действий контекстного меню */
+    connect(updateFiles, SIGNAL(triggered()), this, SLOT(NeedUpdateFileList()));
+    // /* Устанавливаем действия в меню */
+    menu->addAction(updateFiles);
+    /* Вызываем контекстное меню */
+    menu->popup(ui->listTree->viewport()->mapToGlobal(pos));
+}
 
-        if (value.isObject()) {
-            populateTree(arrayItem, value.toObject());
-        } else if (value.isArray()) {
-            populateArray(arrayItem, value.toArray());
-        }
-    }
+void MainWindow::NeedUpdateFileList() {
+    _commandHandler->SendCommand(Operation::GetFileList, {_username, _token});
 }
 
 JsonTreeHandler::JsonTreeHandler() : model(nullptr) {}

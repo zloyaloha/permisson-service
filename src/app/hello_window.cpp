@@ -5,7 +5,7 @@ HelloWindow::HelloWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::HelloWindow), _username(), _token()
 {
     ui->setupUi(this);
-    QPixmap pic("../src/common/file.png");
+    QPixmap pic(":/icons/folder.png");
     int w = ui->label_pic->width();
     int h = ui->label_pic->height();
     QPixmap scaledPic = pic.scaled(w, h, Qt::KeepAspectRatio);
@@ -67,10 +67,12 @@ void HelloWindow::LoginButtonClicked()
     }
     _commandHandler->SendCommand(Operation::Login, {login.toStdString(), password.toStdString()});
     BaseCommand response(_commandHandler->ReadResponse());
-    if (response._msg_data[0] == "Invalid username") {
+    if (response._msg_data[0] == "Invalid username\0") {
         ui->statusbar->showMessage("User with this login isn't exist");
-    } else if (response._msg_data[0] == "Invalid Password") {
+    } else if (response._msg_data[0] == "Invalid Password\0") {
         ui->statusbar->showMessage("Incorrect Password");
+    } else if (response._msg_data[0] == "Session exists\0") {
+        ui->statusbar->showMessage("User already authorized");
     } else {
         ui->statusbar->showMessage("Success login");
         _token = response._msg_data[0];

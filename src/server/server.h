@@ -47,15 +47,24 @@ namespace {
         " password=" + DB_PASSWORD; 
 }
 
+struct FileInfo {
+    QString path;
+    QString fileName;
+    QString fileType;
+    QString userName;
+    QString groupName;
+    bool canRead;
+    bool canWrite;
+    bool canExec;
+};
+
 class FileTreeHandler {
 public:
     FileTreeHandler() = default;
 
     QJsonObject generateFileTree(const pqxx::result& result);
 private:
-    void addFileToTree(QJsonArray& parentArray, const QStringList& pathComponents, 
-                       const QString& name, const QString& type, const QString& path, 
-                       bool canRead, bool canWrite);
+    void addFileToTree(QJsonArray& parentArray, const QStringList& pathComponents, const FileInfo& file);
 };
 
 class Observable {

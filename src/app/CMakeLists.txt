@@ -7,7 +7,6 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 set(CMAKE_CXX_STANDARD 17 -O)
 
-find_package(Qt5 COMPONENTS Widgets Core Gui REQUIRED)
 find_package(Boost REQUIRED COMPONENTS system)
 
 include_directories()
@@ -19,12 +18,20 @@ set(WINDOWS_SRC
     main_window.cpp
 )
 
+set(RESOURCES
+    resources/resources.qrc
+)
+
+qt_add_resources(RESOURCES_GENERATED ${RESOURCES})
+
 qt5_wrap_ui(UI_HEADERS hello_w.ui)
 qt5_wrap_ui(UI_HEADERS app_win.ui)
 
 add_executable(app
     ${WINDOWS_SRC}
     ${UI_HEADERS}
+    ${RESOURCES_GENERATED}
 )
+target_sources(app PRIVATE ${WINDOWS_SRC})
 
 target_link_libraries(app Qt5::Widgets)

@@ -2,7 +2,7 @@
 -- depends: 20241108_01_kHThF-session-table
 
 CREATE OR REPLACE FUNCTION permission_app.AddSession(
-    user_id INT
+    id INT
 )
 RETURNS TEXT
 LANGUAGE plpgsql
@@ -11,6 +11,15 @@ $$
 DECLARE
     new_session_token TEXT;
 BEGIN
+
+    IF EXISTS (
+        SELECT 1
+        FROM permission_app.sessions
+        WHERE user_id = id AND exit_at IS NULL
+    ) THEN
+        RETURN 'Session exists';
+    END IF;
+
     new_session_token := encode(gen_random_bytes(32), 'hex');
 
     INSERT INTO permission_app.sessions (
@@ -18,7 +27,7 @@ BEGIN
         session_token
     )
     VALUES (
-        user_id,
+        id,
         new_session_token
     );
 
