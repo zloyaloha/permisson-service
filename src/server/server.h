@@ -95,6 +95,7 @@ class Worker : public std::enable_shared_from_this<Worker>, public Observable {
         std::string Registrate(const std::string& login, const std::string& password);
         std::string Login(const std::string& login, const std::string& password);
         std::string CreateFile(const std::string& username, const std::string& path, const std::string& filename);
+        std::string CreateDir(const std::string& username, const std::string& path, const std::string& filename);
         std::string GetFileList();
         void Quit(const std::string& token);
     private:

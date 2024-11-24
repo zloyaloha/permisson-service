@@ -2,7 +2,9 @@
 
 
 CommandHandler::CommandHandler(boost::asio::io_context& io_context, const std::string& host, const std::string& port) : 
-    _io_context(io_context), _socket(io_context), _host(host), _port(port), _resolver(io_context) {}
+    _io_context(io_context), _socket(io_context), _host(host), _port(port), _resolver(io_context) {
+        // responseBuffer.prepare(8192);
+    }
 
 void CommandHandler::Connect() {
     auto self = shared_from_this();
@@ -41,19 +43,28 @@ void CommandHandler::StopAsyncReading() {
 
 void CommandHandler::AsyncReadResponse() {
     auto self(shared_from_this());
-    boost::asio::async_read_until(_socket, responseBuffer, TERMINATING_STRING,
+    boost::asio::async_read(_socket, responseBuffer, boost::asio::transfer_at_least(1),
         [this, self](boost::system::error_code ec, std::size_t bytes_transferred) {
             if (!ec) {
                 std::istream is(&responseBuffer);
                 std::string data;
-                std::getline(is, data, '\r');
+                std::getline(is, data, '\0');
+                // std::cout << data << std::endl;
+                _buffer += data;
+                std::cout << "bytes " << bytes_transferred << ' ' << data.size() << std::endl;
                 responseBuffer.consume(bytes_transferred);
                 try {
-                    BaseCommand command(data);
-                    HandleMessage(command);
-                } catch (...) {
-                    std::cout << "Some problems with packet" << std::endl;
-                }
+                    BaseCommand command(_buffer);
+                    std::cout << "Packet size " << command._packetSize << ' ' << _buffer.size() << ' ' << command._msg_data[0].size() << std::endl;
+                    std::cout << "----------" << std::endl;
+                    std::cout << command._msg_data[0] << std::endl;
+                    std::cout << "----------" << std::endl;
+                    if (command._packetSize <= _buffer.size()) {
+                        HandleMessage(command);
+                        _buffer = "";
+                    }
+                } catch (...) {}
+                responseBuffer.consume(bytes_transferred);
                 AsyncReadResponse();
             } else {
                 boost::system::error_code ignored_ec;
@@ -95,13 +106,15 @@ BaseCommand CommandHandler::ReadResponse() {
 
         boost::asio::read_until(_socket, responseBuffer, TERMINATING_STRING);
         
-        std::string response(boost::asio::buffer_cast<const char*>(responseBuffer.data()), responseBuffer.size());
+        std::istream is(&responseBuffer);
+        std::string data;
+        std::getline(is, data, '\0');
 
-        BaseCommand command(response);
+        BaseCommand command(data);
 
-        std::cout << "Ответ получен: " << response << std::endl;
+        std::cout << "Ответ получен: " << data << std::endl;
 
-        responseBuffer.consume(response.size());
+        responseBuffer.consume(data.size());
         
         return command;
     } catch (std::exception& e) {

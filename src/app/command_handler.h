@@ -20,8 +20,9 @@ class CommandHandler: public QObject, public std::enable_shared_from_this<Comman
         tcp::socket _socket;
         boost::asio::io_context& _io_context;
         tcp::resolver _resolver;
+        bool _success;
         boost::asio::streambuf responseBuffer;
-        std::string _buffer;
+        std::string _buffer{""};
         bool asyncReadingEnabled{false};
         std::string _host, _port;
     public:

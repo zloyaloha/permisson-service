@@ -33,7 +33,8 @@ void Session::ReadMessage() {
             if (!ec) {
                 std::istream is(&_buffer);
                 std::string data;
-                std::getline(is, data, '\r');
+                std::getline(is, data, '\0');
+                std::cout << bytes_transferred << std::endl;
                 _buffer.consume(bytes_transferred);
                 try {
                     BaseCommand command(data);
@@ -156,6 +157,15 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             result = CreateFile(command._msg_data[0], command._msg_data[2], command._msg_data[3]); // username, path, filename
             SendResponse(command._op, {result});
             break;
+        case Operation::CreateDir:
+            NotifyObservers("Create file " + command._msg_data[0] + ' ' + command._msg_data[2] + ' ' + command._msg_data[3]); // username
+            if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
+                NotifyObservers("Security warning");
+                break;
+            }
+            result = CreateDir(command._msg_data[0], command._msg_data[2], command._msg_data[3]); // username, path, filename
+            SendResponse(command._op, {result});
+            break;
         case Operation::GetFileList:
             NotifyObservers("GetFileList file " + command._msg_data[0]); // username
             if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
@@ -175,6 +185,7 @@ std::string Worker::GetFileList() {
         work.commit();
         QJsonObject jsonTree = _treeHandler.generateFileTree(result);
         QJsonDocument doc(jsonTree);
+        std::cout <<  doc.toJson().toStdString() << '\n' << doc.toJson(QJsonDocument::Compact).toStdString().size() << std::endl;
         return doc.toJson(QJsonDocument::Compact).toStdString();
     } catch (std::string error) {
         NotifyObservers("Error: " + error);
@@ -186,6 +197,18 @@ std::string Worker::CreateFile(const std::string& username, const std::string& p
     try {
         pqxx::work work(*_connection);
         pqxx::result result = work.exec("SELECT permission_app.AddFileToPath(" + work.quote(path) + ", " + work.quote(filename) + ", " + work.quote(username) + ");");
+        work.commit();
+        return GetStringQueryResult(result);
+    } catch (std::string error) {
+        NotifyObservers("Error: " + error);
+        return "Error";
+    }
+}
+
+std::string Worker::CreateDir(const std::string& username, const std::string& path, const std::string& filename) {
+    try {
+        pqxx::work work(*_connection);
+        pqxx::result result = work.exec("SELECT permission_app.AddDirectoryToPath(" + work.quote(path) + ", " + work.quote(filename) + ", " + work.quote(username) + ");");
         work.commit();
         return GetStringQueryResult(result);
     } catch (std::string error) {
@@ -228,6 +251,7 @@ std::string Worker::Login(const std::string& login, const std::string& password)
         return "Invalid username";
     }
     std::pair<std::string, std::string> passwordAndSalt = GetSaltAndPassword(login);
+    std::cout << password << std::endl;
     std::string hashedPassword = HashPassword(password, passwordAndSalt.second);
     if (hashedPassword != passwordAndSalt.first) {
         return "Invalid password";

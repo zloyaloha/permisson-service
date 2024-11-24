@@ -42,6 +42,7 @@ class MainWindow : public QMainWindow {
     public slots:
         void NeedUpdateFileList();
         void CreateFileButtonClicked();
+        void CreateDirButtonClicked();
         void ShowContextMenu(QPoint);
     private:
         std::shared_ptr<CommandHandler> _commandHandler;

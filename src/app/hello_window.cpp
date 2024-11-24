@@ -67,11 +67,11 @@ void HelloWindow::LoginButtonClicked()
     }
     _commandHandler->SendCommand(Operation::Login, {login.toStdString(), password.toStdString()});
     BaseCommand response(_commandHandler->ReadResponse());
-    if (response._msg_data[0] == "Invalid username\0") {
+    if (response._msg_data[0] == "Invalid username") {
         ui->statusbar->showMessage("User with this login isn't exist");
-    } else if (response._msg_data[0] == "Invalid Password\0") {
+    } else if (response._msg_data[0] == "Invalid password") {
         ui->statusbar->showMessage("Incorrect Password");
-    } else if (response._msg_data[0] == "Session exists\0") {
+    } else if (response._msg_data[0] == "Session exists") {
         ui->statusbar->showMessage("User already authorized");
     } else {
         ui->statusbar->showMessage("Success login");

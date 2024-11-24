@@ -8,6 +8,7 @@ MainWindow::MainWindow(std::shared_ptr<CommandHandler> commandor, QWidget *paren
     connect(_commandHandler.get(), &CommandHandler::GetRoleMessageReceived, this, &MainWindow::OnRoleMessageReceived);
     connect(_commandHandler.get(), &CommandHandler::UpdateFileList, this, &MainWindow::OnUpdateFileList);
     connect(ui->createFileButton, &QPushButton::clicked, this, &MainWindow::CreateFileButtonClicked);
+    connect(ui->dirCreateButton, &QPushButton::clicked, this, &MainWindow::CreateDirButtonClicked);
     connect(ui->listTree, SIGNAL(customContextMenuRequested(QPoint)), SLOT(ShowContextMenu(QPoint)));
 
     QFile file(":/styles/styles.qss");
@@ -30,7 +31,6 @@ void MainWindow::SetupWindow(const QString& username, const QString& token) {
     _token = token.toStdString();
     _username = username.toStdString();
     ui->usernameLine->setText(username);
-    _commandHandler->StartAsyncReading();
     _commandHandler->SendCommand(Operation::GetRole, {_username, _token});
     _commandHandler->SendCommand(Operation::GetFileList, {_username, _token});
     this->show();
@@ -42,15 +42,28 @@ void MainWindow::CreateFileButtonClicked() {
     if (lastSlashPos == std::string::npos) {
         std::string path = "";
         std::string filename = pathToFile;
-        std::cout << "Path: " << path << ", Filename: " << filename << std::endl;
         _commandHandler->SendCommand(Operation::CreateFile, {_username, _token, path, filename});
     } else {
         std::string path = pathToFile.substr(0, lastSlashPos);
         std::string filename = pathToFile.substr(lastSlashPos + 1);
-        std::cout << "Path: " << path << ", Filename: " << filename << std::endl;
         _commandHandler->SendCommand(Operation::CreateFile, {_username, _token, path, filename});
     }
 }
+
+void MainWindow::CreateDirButtonClicked() {
+    std::string pathToFile = "root/" + ui->dirCreateLine->text().toStdString();
+    size_t lastSlashPos = pathToFile.find_last_of("/\\");
+    if (lastSlashPos == std::string::npos) {
+        std::string path = "";
+        std::string filename = pathToFile;
+        _commandHandler->SendCommand(Operation::CreateDir, {_username, _token, path, filename});
+    } else {
+        std::string path = pathToFile.substr(0, lastSlashPos);
+        std::string filename = pathToFile.substr(lastSlashPos + 1);
+        _commandHandler->SendCommand(Operation::CreateFile, {_username, _token, path, filename});
+    }
+}
+
 
 void MainWindow::OnRoleMessageReceived(const QString& message) {
     ui->roleLine->setText(message);
