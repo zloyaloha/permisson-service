@@ -13,6 +13,7 @@
 #include <QJsonArray>
 #include <QStandardItemModel>
 #include <QTreeView>
+#include <QFile>
 
 class JsonTreeHandler {
 public:

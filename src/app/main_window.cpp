@@ -9,6 +9,17 @@ MainWindow::MainWindow(std::shared_ptr<CommandHandler> commandor, QWidget *paren
     connect(_commandHandler.get(), &CommandHandler::UpdateFileList, this, &MainWindow::OnUpdateFileList);
     connect(ui->createFileButton, &QPushButton::clicked, this, &MainWindow::CreateFileButtonClicked);
     connect(ui->listTree, SIGNAL(customContextMenuRequested(QPoint)), SLOT(ShowContextMenu(QPoint)));
+
+    QFile file(":/styles/styles.qss");
+
+    if (file.open(QFile::ReadOnly | QFile::Text)) {
+        QString styleSheet = QLatin1String(file.readAll());
+        ui->listTree->setStyleSheet(styleSheet);
+        file.close();
+    } else {
+        qWarning() << "Failed to load stylesheet from";
+    }
+
 }
 
 MainWindow::~MainWindow() {
@@ -26,7 +37,7 @@ void MainWindow::SetupWindow(const QString& username, const QString& token) {
 }
 
 void MainWindow::CreateFileButtonClicked() {
-    std::string pathToFile = ui->createFile->text().toStdString();
+    std::string pathToFile = "root/" + ui->createFile->text().toStdString();
     size_t lastSlashPos = pathToFile.find_last_of("/\\");
     if (lastSlashPos == std::string::npos) {
         std::string path = "";
@@ -61,8 +72,7 @@ void JsonTreeHandler::LoadJsonToTreeView(QTreeView* treeView, const QJsonDocumen
     }
 
     model = new QStandardItemModel(treeView);
-    model->setHorizontalHeaderLabels({"Name", "Type", "Can Read", "Can Write", "Can Execute"});
-    // model->setFlags(model->flags() & ~Qt::ItemIsEditable); // Запрещает редактирование всей модели
+    model->setHorizontalHeaderLabels({"Name", "Type", "Owner name", "Group name", "Can Read", "Can Write", "Can Execute"});
 
     QStandardItem* rootItem = model->invisibleRootItem();
 
@@ -82,17 +92,22 @@ void JsonTreeHandler::LoadJsonToTreeView(QTreeView* treeView, const QJsonDocumen
 
     treeView->setModel(model);
     treeView->expandAll();
+    treeView->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
 }
 
 void JsonTreeHandler::PopulateTree(QStandardItem* parentItem, const QJsonObject& jsonObject) {
     QJsonValue nameValue = jsonObject.value("name");
     QJsonValue typeValue = jsonObject.value("type");
+    QJsonValue userNameValue = jsonObject.value("userName");
+    QJsonValue groupNameValue = jsonObject.value("groupName");
     QJsonValue canReadValue = jsonObject.value("can_read");
     QJsonValue canWriteValue = jsonObject.value("can_write");
     QJsonValue canExecValue = jsonObject.value("can_exec");
 
     QStandardItem* nameItem = new QStandardItem(nameValue.toString());
     QStandardItem* typeItem = new QStandardItem(typeValue.toString());
+    QStandardItem* userNameItem = new QStandardItem(userNameValue.toString());
+    QStandardItem* groupNameItem = new QStandardItem(groupNameValue.toString());
     QStandardItem* canReadItem = new QStandardItem(canReadValue.toString());
     QStandardItem* canWriteItem = new QStandardItem(canWriteValue.toString());
     QStandardItem* canExecItem = new QStandardItem(canExecValue.toString());
@@ -104,7 +119,7 @@ void JsonTreeHandler::PopulateTree(QStandardItem* parentItem, const QJsonObject&
         QStandardItem* folderItem = new QStandardItem(nameValue.toString());
         folderItem->setData("DIR", Qt::UserRole);
         folderItem->setIcon(folderIcon);
-        parentItem->appendRow({folderItem, typeItem, canReadItem, canWriteItem, canExecItem});
+        parentItem->appendRow({folderItem, typeItem, userNameItem, groupNameItem, canReadItem, canWriteItem, canExecItem});
 
         QJsonValue filesValue = jsonObject.value("files");
         if (filesValue.isArray()) {
@@ -117,18 +132,15 @@ void JsonTreeHandler::PopulateTree(QStandardItem* parentItem, const QJsonObject&
         }
     } else if (typeValue.toString() == "FILE") {
         nameItem->setIcon(fileIcon);
-        parentItem->appendRow({nameItem, typeItem, canReadItem, canWriteItem, canExecItem});
+        parentItem->appendRow({nameItem, typeItem, userNameItem, groupNameItem, canReadItem, canWriteItem, canExecItem});
     }
 }
 
 void MainWindow::ShowContextMenu(QPoint pos) {
     QMenu* menu = new QMenu(this);
     QAction* updateFiles = new QAction(tr("Обновить"), this);
-    // /* Подключаем СЛОТы обработчики для действий контекстного меню */
     connect(updateFiles, SIGNAL(triggered()), this, SLOT(NeedUpdateFileList()));
-    // /* Устанавливаем действия в меню */
     menu->addAction(updateFiles);
-    /* Вызываем контекстное меню */
     menu->popup(ui->listTree->viewport()->mapToGlobal(pos));
 }
 

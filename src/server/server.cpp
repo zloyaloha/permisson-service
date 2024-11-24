@@ -59,6 +59,18 @@ void Session::ReadMessage() {
         });
 }
 
+pqxx::result Worker::MakeQuery(const std::string& query) {
+    pqxx::result result;
+    try {
+        pqxx::work work(*_connection);
+        result = work.exec(query);
+        work.commit();
+    } catch (std::string error) {
+        NotifyObservers("Error: " + error); 
+    }
+    return result;
+}
+
 Worker::Worker(ThreadPool& threadPool, std::shared_ptr<tcp::socket> socket, std::vector<std::shared_ptr<IServerObserver>>& observers) 
     : _threadPool(threadPool), _socket(socket), Observable(observers), _connection(std::make_unique<pqxx::connection>(PARAM_STRING)) {}
 
@@ -92,10 +104,15 @@ bool Worker::ValidateRequest(const std::string& username, const std::string& tok
 }
 
 std::string Worker::GetToken(const std::string& username) {
-    pqxx::work work(*_connection);
-    pqxx::result result = work.exec("SELECT permission_app.GetToken(" + work.quote(username) + ");");
-    work.commit();
-    return GetStringQueryResult(result);
+    try {
+        pqxx::work work(*_connection);
+        pqxx::result result = work.exec("SELECT permission_app.GetToken(" + work.quote(username) + ");");
+        work.commit();
+        return GetStringQueryResult(result);
+    } catch (std::string error) {
+        NotifyObservers("Error: " + error); 
+    }
+    return "";
 }
 
 
@@ -152,38 +169,57 @@ void Worker::ProccessOperation(const BaseCommand &command) {
 }
 
 std::string Worker::GetFileList() {
-    pqxx::work work(*_connection);
-    pqxx::result result = work.exec("SELECT * FROM permission_app.GetFileTreeWithPermissions();");
-    work.commit();
-    QJsonObject jsonTree = _treeHandler.generateFileTree(result);
-    QJsonDocument doc(jsonTree);
-    std::cout << doc.toJson().toStdString() << std::endl;
-    return doc.toJson(QJsonDocument::Compact).toStdString();
+    try {
+        pqxx::work work(*_connection);
+        pqxx::result result = work.exec("SELECT * FROM permission_app.GetFileTreeWithPermissions();");
+        work.commit();
+        QJsonObject jsonTree = _treeHandler.generateFileTree(result);
+        QJsonDocument doc(jsonTree);
+        return doc.toJson(QJsonDocument::Compact).toStdString();
+    } catch (std::string error) {
+        NotifyObservers("Error: " + error);
+        return "Error";
+    }
 }
 
 std::string Worker::CreateFile(const std::string& username, const std::string& path, const std::string& filename) {
-    pqxx::work work(*_connection);
-    pqxx::result result = work.exec("SELECT permission_app.AddFileToPath(" + work.quote(path) + ", " + work.quote(filename) + ", " + work.quote(username) + ");");
-    work.commit();
-    return GetStringQueryResult(result);
+    try {
+        pqxx::work work(*_connection);
+        pqxx::result result = work.exec("SELECT permission_app.AddFileToPath(" + work.quote(path) + ", " + work.quote(filename) + ", " + work.quote(username) + ");");
+        work.commit();
+        return GetStringQueryResult(result);
+    } catch (std::string error) {
+        NotifyObservers("Error: " + error);
+        return "Error";
+    }
 }
 
 std::string Worker::GetRole(const std::string& role) {
-    pqxx::work work(*_connection);
-    pqxx::result result = work.exec("SELECT permission_app.UserRights(" + work.quote(role) + ");");
-    work.commit();
-    std::string admin = GetStringQueryResult(result);
-    if (admin == "t") {
-        return "admin";
-    } else {
-        return "common";
+    try {
+        pqxx::work work(*_connection);
+        pqxx::result result = work.exec("SELECT permission_app.UserRights(" + work.quote(role) + ");");
+        work.commit();
+        std::string admin = GetStringQueryResult(result);
+        if (admin == "t") {
+            return "admin";
+        } else {
+            return "common";
+        }
+    } catch (std::string error) {
+        NotifyObservers("Error: " + error);
+        return "Error";
     }
 }
 
 void Worker::Quit(const std::string& token) {
-    pqxx::work work(*_connection);
-    pqxx::result result = work.exec("CALL permission_app.UpdateExitTime(" + work.quote(token) + ");");
-    work.commit();
+    try {
+        pqxx::work work(*_connection);
+        pqxx::result result = work.exec("CALL permission_app.UpdateExitTime(" + work.quote(token) + ");");
+        work.commit();
+    } catch (std::string error) {
+        NotifyObservers("Error: " + error);
+        return;
+    }
 }
 
 std::string Worker::Login(const std::string& login, const std::string& password) {
@@ -211,36 +247,56 @@ std::string Worker::Registrate(const std::string& login, const std::string& pass
 }
 
 std::pair<std::string, std::string> Worker::GetSaltAndPassword(const std::string& login) {
-    pqxx::work work(*_connection);
-    pqxx::result result = work.exec("SELECT permission_app.GetSaltAndPassword(" + work.quote(login) + ");");
-    work.commit();
-    return GetPairQueryResult(result);  
+    try {
+        pqxx::work work(*_connection);
+        pqxx::result result = work.exec("SELECT permission_app.GetSaltAndPassword(" + work.quote(login) + ");");
+        work.commit();
+        return GetPairQueryResult(result);  
+    } catch (std::string error) {
+        NotifyObservers("Error: " + error);
+        return std::make_pair("", "");
+    }
 }
 
 std::string Worker::CreateSession(const int user_id) {
-    pqxx::work work(*_connection);
-    pqxx::result result = work.exec("SELECT permission_app.AddSession(" + work.quote(user_id) + ");");
-    std::string response = GetStringQueryResult(result);
-    work.commit();
-    return response;
+    try {
+        pqxx::work work(*_connection);
+        pqxx::result result = work.exec("SELECT permission_app.AddSession(" + work.quote(user_id) + ");");
+        std::string response = GetStringQueryResult(result);
+        work.commit();
+        return response;
+    } catch (std::string error) {
+        NotifyObservers("Error: " + error);
+        return "";
+    }
 }
 
 
 int Worker::UserID(const std::string& login) {
-    pqxx::work work(*_connection);
-    pqxx::result result = work.exec("SELECT permission_app.UserID(" + work.quote(login) + ");");
-    std::string response = GetStringQueryResult(result);
-    work.commit();
-    return std::stoi(response);
+    try {
+        pqxx::work work(*_connection);
+        pqxx::result result = work.exec("SELECT permission_app.UserID(" + work.quote(login) + ");");
+        std::string response = GetStringQueryResult(result);
+        work.commit();
+        return std::stoi(response);
+    } catch (std::string error) {
+        NotifyObservers("Error: " + error);
+        return 0;
+    }
 }
 
 void Worker::CreateUser(const std::string &username, const std::string& hashed_password, const std::string& salt) {
-    pqxx::work work(*_connection);
-    pqxx::result result = work.exec("CALL permission_app.CreateUser(" 
-                                        + work.quote(username) + ", "
-                                        + work.quote(hashed_password) + ", "
-                                        + work.quote(salt) + ");");
-    work.commit();
+    try {
+        pqxx::work work(*_connection);
+        pqxx::result result = work.exec("CALL permission_app.CreateUser(" 
+                                            + work.quote(username) + ", "
+                                            + work.quote(hashed_password) + ", "
+                                            + work.quote(salt) + ");");
+        work.commit();
+    } catch (std::string error) {
+        NotifyObservers("Error: " + error);
+        return;
+    }
 }
 
 std::string Worker::GenerateSalt(std::size_t size) const {
@@ -333,7 +389,8 @@ void ServerTerminalObserver::Notify(const std::tm* time, const std::string& str)
             file.canRead = row["can_read"].as<bool>();
             file.canWrite = row["can_write"].as<bool>();
             file.canExec = row["can_exec"].as<bool>();
-
+            file.userName = QString::fromStdString(row["owner_name"].c_str());
+            file.groupName = QString::fromStdString(row["group_name"].c_str());
             addFileToTree(fileSystem, pathComponents, file);
         }
 
@@ -357,19 +414,20 @@ void FileTreeHandler::addFileToTree(QJsonArray& parentArray, const QStringList& 
         if (obj["name"].toString() == currentComponent) {
             currentNode = obj;
             nodeFound = true;
-            parentArray.removeAt(i); // Удаляем объект для обновления
+            parentArray.removeAt(i);
             break;
         }
     }
 
-    // Если узел не найден, создаем новый
     if (!nodeFound) {
         currentNode["name"] = currentComponent;
         currentNode["type"] = file.fileType;
         currentNode["path"] = file.path;
+        currentNode["userName"] = file.userName;
+        currentNode["groupName"] = file.groupName;
         currentNode["can_read"] = file.canRead ? "t" : "f";
         currentNode["can_write"] = file.canWrite ? "t" : "f";
-        currentNode["can_exec"] = file.canExec ? "t" : "F";
+        currentNode["can_exec"] = file.canExec ? "t" : "f";
         currentNode["files"] = QJsonArray();
     }
 

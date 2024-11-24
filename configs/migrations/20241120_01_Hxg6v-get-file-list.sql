@@ -9,8 +9,8 @@ RETURNS TABLE (
     can_read BOOLEAN,
     can_write BOOLEAN,
     can_exec BOOLEAN,
-    owner_name TEXT, -- Имя владельца файла
-    group_name TEXT  -- Имя группы владельцев файла
+    owner_name VARCHAR(50), -- Имя владельца файла
+    group_name VARCHAR(255)  -- Имя группы владельцев файла
 )
 LANGUAGE plpgsql
 AS $$ 
@@ -48,7 +48,7 @@ BEGIN
         p.can_read AS can_read,
         p.can_write AS can_write,
         p.can_execute AS can_exec,
-        o.name AS owner_name,      -- Имя владельца
+        o.login AS owner_name,      -- Имя владельца
         g.name AS group_name       -- Имя группы владельцев
     FROM file_tree AS ft
     LEFT JOIN permission_app.permissions AS p ON ft.file_id = p.node_id

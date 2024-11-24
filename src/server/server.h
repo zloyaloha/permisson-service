@@ -110,6 +110,7 @@ class Worker : public std::enable_shared_from_this<Worker>, public Observable {
         int UserID(const std::string& login);
         std::string GetStringQueryResult(const pqxx::result& result) const;
         std::pair<std::string, std::string> GetPairQueryResult(const pqxx::result& result) const;
+        pqxx::result MakeQuery(const std::string& query);
     private:
         FileTreeHandler _treeHandler;
         ThreadPool& _threadPool;
