@@ -3,6 +3,7 @@
 #include <cstring>
 #include <sstream>
 #include <iostream>
+#include <iomanip>
 
 namespace {
     const int BUFFER_SIZE = 65665;
@@ -25,7 +26,13 @@ public:
     int32_t _packetSize;
     std::vector<std::string> _msg_data;
     BaseCommand(Operation op, int32_t pid, const std::initializer_list<std::string>& msg_data) : 
-        _op(op), _packetSize(pid), _msg_data(msg_data) {}
+        _op(op), _packetSize(0), _msg_data(msg_data) {
+            _packetSize += std::to_string(_op).size();
+            _packetSize += 8;
+            for (const std::string& str: msg_data) {
+                _packetSize += str.size();
+            }
+        }
 
     BaseCommand(const std::string& msg) 
     {
@@ -38,11 +45,11 @@ public:
         while (std::getline(stream, line)) {
             _msg_data.push_back(line);
         }
-        // _msg_data[_msg_data.size() - 1] = _msg_data[_msg_data.size() - 1].substr(0, _msg_data[_msg_data.size() - 1].size() - 1);
     }
 
     std::string toPacket() {
         std::ostringstream oss;
+        oss << _op << '\n' << std::setw(8) << std::setfill('0') << _packetSize << '\n';
         if (_msg_data.size() == 0) {
             return "" + TERMINATING_STRING;
         }
@@ -50,8 +57,7 @@ public:
             oss << _msg_data[i] << '\n';
         }
         oss << _msg_data[_msg_data.size() - 1] << TERMINATING_STRING;
-        std::string dataStr = oss.str();
-        return std::to_string(_op) + "\n" + std::to_string(dataStr.size() + 2 + 2) + "\n" + dataStr;
+        return oss.str();
     }
 
     std::string MakeJson() const {

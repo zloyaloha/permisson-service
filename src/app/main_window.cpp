@@ -60,7 +60,7 @@ void MainWindow::CreateDirButtonClicked() {
     } else {
         std::string path = pathToFile.substr(0, lastSlashPos);
         std::string filename = pathToFile.substr(lastSlashPos + 1);
-        _commandHandler->SendCommand(Operation::CreateFile, {_username, _token, path, filename});
+        _commandHandler->SendCommand(Operation::CreateDir, {_username, _token, path, filename});
     }
 }
 

@@ -56,10 +56,10 @@ void CommandHandler::AsyncReadResponse() {
                 try {
                     BaseCommand command(_buffer);
                     std::cout << "Packet size " << command._packetSize << ' ' << _buffer.size() << ' ' << command._msg_data[0].size() << std::endl;
-                    std::cout << "----------" << std::endl;
-                    std::cout << command._msg_data[0] << std::endl;
-                    std::cout << "----------" << std::endl;
                     if (command._packetSize <= _buffer.size()) {
+                        std::cout << "----------" << std::endl;
+                        std::cout << command._msg_data[0] << std::endl;
+                        std::cout << "----------" << std::endl;
                         HandleMessage(command);
                         _buffer = "";
                     }
