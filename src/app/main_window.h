@@ -39,11 +39,12 @@ class MainWindow : public QMainWindow {
     private slots:
         void OnRoleMessageReceived(const QString& role);
         void OnUpdateFileList(const QString& role);
-    public slots:
+        void DeleteFile(const QString& filename);
         void NeedUpdateFileList();
+    public slots:
         void CreateFileButtonClicked();
         void CreateDirButtonClicked();
-        void ShowContextMenu(QPoint);
+        void ShowContextMenu(const QPoint& pos);
     private:
         std::shared_ptr<CommandHandler> _commandHandler;
         std::shared_ptr<JsonTreeHandler> _treeHandler;

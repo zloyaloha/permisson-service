@@ -45,7 +45,7 @@ void Session::ReadMessage() {
                         _socket->close();
                         return;
                     }
-                    NotifyObservers("Сообщение получено\n" + data);
+                    NotifyObservers("Сообщение получено\n" + std::to_string(command._op));
                     _threadPool.EnqueueTask([this, command] { _worker->ProccessOperation(command); });
                     ReadMessage();
                 } catch (...) {
@@ -166,6 +166,15 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             result = CreateDir(command._msg_data[0], command._msg_data[2], command._msg_data[3]); // username, path, filename
             SendResponse(command._op, {result});
             break;
+        case Operation::DeleteFile:
+            NotifyObservers("Delete file " + command._msg_data[3]); // filename
+            if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
+                NotifyObservers("Security warning");
+                break;
+            }
+            result = DeleteFile(command._msg_data[0], command._msg_data[3]);
+            SendResponse(command._op, {result});
+            break;
         case Operation::GetFileList:
             NotifyObservers("GetFileList file " + command._msg_data[0]); // username
             if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
@@ -175,6 +184,18 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             result = GetFileList();
             SendResponse(command._op, {result});
             break;
+    }
+}
+
+std::string Worker::DeleteFile(const std::string& username, const std::string& filename) {
+    try {
+        pqxx::work work(*_connection);
+        pqxx::result result = work.exec("SELECT permission_app.DeleteFileByNameAndUser(" + work.quote(username) + ", " + work.quote(filename) + ");");
+        work.commit();
+        return GetStringQueryResult(result);
+    } catch (std::string error) {
+        NotifyObservers("Error: " + error);
+        return "Error";
     }
 }
 

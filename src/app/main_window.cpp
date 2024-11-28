@@ -149,16 +149,29 @@ void JsonTreeHandler::PopulateTree(QStandardItem* parentItem, const QJsonObject&
     }
 }
 
-void MainWindow::ShowContextMenu(QPoint pos) {
+void MainWindow::ShowContextMenu(const QPoint& pos) {
+    QModelIndex index = ui->listTree->indexAt(pos);
+    if (!index.isValid()) {
+        return;
+    }
     QMenu* menu = new QMenu(this);
     QAction* updateFiles = new QAction(tr("Обновить"), this);
+    QAction* deleteFile = new QAction(tr("Удалить"), this);
+    connect(deleteFile, &QAction::triggered, [this, index]() { DeleteFile(index.data(Qt::DisplayRole).toString()); });
     connect(updateFiles, SIGNAL(triggered()), this, SLOT(NeedUpdateFileList()));
     menu->addAction(updateFiles);
+    menu->addAction(deleteFile);
     menu->popup(ui->listTree->viewport()->mapToGlobal(pos));
 }
 
 void MainWindow::NeedUpdateFileList() {
     _commandHandler->SendCommand(Operation::GetFileList, {_username, _token});
+}
+
+void MainWindow::DeleteFile(const QString& filename) {
+    std::string file = filename.toStdString();
+    std::cout << "delete file " << file << std::endl;
+    _commandHandler->SendCommand(Operation::DeleteFile, {_username, _token, file});
 }
 
 JsonTreeHandler::JsonTreeHandler() : model(nullptr) {}

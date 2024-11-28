@@ -17,7 +17,8 @@ enum Operation {
     GetRole,
     CreateFile,
     GetFileList,
-    CreateDir
+    CreateDir,
+    DeleteFile
 };
 
 class BaseCommand {
