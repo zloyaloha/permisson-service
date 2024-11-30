@@ -34,10 +34,11 @@ class CommandHandler: public QObject, public std::enable_shared_from_this<Comman
         void StopAsyncReading();
         void AsyncReadResponse();
     private:
-        void handle_read(const boost::system::error_code& error);
         void ConnectToServer(tcp::resolver::results_type& endpoints);
         void HandleMessage(const BaseCommand& command);
     signals:
         void GetRoleMessageReceived(const QString& response);
         void UpdateFileList(const QString& response);
+        void FileDeleted(const QString& response);
+        void GetUsersList(const QString& response);
 };

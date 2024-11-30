@@ -13,6 +13,7 @@
 #include <QJsonArray>
 #include <QStandardItemModel>
 #include <QTreeView>
+#include <QMessageBox>
 #include <QFile>
 
 class JsonTreeHandler {
@@ -30,6 +31,19 @@ private:
     void PopulateTree(QStandardItem* parentItem, const QJsonObject& jsonObject);
 };
 
+class JsonUserListHandler {
+public:
+    JsonUserListHandler();
+    ~JsonUserListHandler();
+
+    void LoadJsonToTableView(QTableView* tableView, const QJsonDocument& jsonDocument);
+
+private:
+    QStandardItemModel* usersModel;
+
+    void AddUser(const QJsonObject& jsonObject);
+};
+
 class MainWindow : public QMainWindow {
     Q_OBJECT
     public:
@@ -39,6 +53,8 @@ class MainWindow : public QMainWindow {
     private slots:
         void OnRoleMessageReceived(const QString& role);
         void OnUpdateFileList(const QString& role);
+        void OnFileDeleted(const QString& response);
+        void OnGetUsersList(const QString& response);
         void DeleteFile(const QString& filename);
         void NeedUpdateFileList();
     public slots:
@@ -48,6 +64,7 @@ class MainWindow : public QMainWindow {
     private:
         std::shared_ptr<CommandHandler> _commandHandler;
         std::shared_ptr<JsonTreeHandler> _treeHandler;
+        std::shared_ptr<JsonUserListHandler> _usersListHandler;
         Ui::MainWindow *ui;
         std::string _username;
         std::string _token;

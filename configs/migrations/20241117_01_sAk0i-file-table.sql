@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS permission_app.nodes (
     file_data BYTEA,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
 CREATE TABLE IF NOT EXISTS permission_app.events (
     event_id SERIAL PRIMARY KEY,
     user_id INT REFERENCES permission_app.users(user_id) ON DELETE CASCADE,

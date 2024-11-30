@@ -18,7 +18,8 @@ enum Operation {
     CreateFile,
     GetFileList,
     CreateDir,
-    DeleteFile
+    DeleteFile,
+    GetUsersList
 };
 
 class BaseCommand {
@@ -58,6 +59,7 @@ public:
             oss << _msg_data[i] << '\n';
         }
         oss << _msg_data[_msg_data.size() - 1] << TERMINATING_STRING;
+        std::cout << _msg_data[_msg_data.size() - 1] << std::endl;
         return oss.str();
     }
 

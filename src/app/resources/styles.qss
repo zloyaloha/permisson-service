@@ -6,6 +6,16 @@ QTreeView::branch:has-siblings:adjoins-item {
     border-image: url(:/icons/branch-more.png) 0;
 }
 
+QTreeView::item:selected {
+    background: #d9e8fb;
+    color: #000000; 
+    border: 1px solid #9ec9f7;
+}
+
+QTreeView::item:focus {
+    outline: none;
+}
+
 QTreeView::branch:!has-children:!has-siblings:adjoins-item {
     border-image: url(:/icons/branch-end.png) 0;
 }

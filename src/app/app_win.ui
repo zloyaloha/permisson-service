@@ -6,99 +6,27 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>984</width>
-    <height>783</height>
+    <width>1069</width>
+    <height>826</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>MainWindow</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <widget class="QGroupBox" name="buttonsGroupBox">
-    <property name="geometry">
-     <rect>
-      <x>630</x>
-      <y>470</y>
-      <width>311</width>
-      <height>160</height>
-     </rect>
-    </property>
-    <property name="title">
-     <string>Действия</string>
-    </property>
-    <layout class="QVBoxLayout" name="verticalLayout_4">
-     <item>
-      <layout class="QVBoxLayout" name="verticalLayout">
-       <item>
-        <layout class="QGridLayout" name="gridLayout">
-         <item row="0" column="0">
-          <widget class="QLineEdit" name="dirRemoveLine"/>
-         </item>
-         <item row="0" column="1">
-          <widget class="QLineEdit" name="dirCreateLine"/>
-         </item>
-         <item row="1" column="0">
-          <widget class="QPushButton" name="dirRemoveButton">
-           <property name="text">
-            <string>Удалить директорю</string>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="1">
-          <widget class="QPushButton" name="dirCreateButton">
-           <property name="text">
-            <string>Создать директорию</string>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </item>
-       <item>
-        <layout class="QGridLayout" name="buttonsGrid">
-         <item row="0" column="0">
-          <layout class="QVBoxLayout" name="verticalLayout_2">
-           <item>
-            <widget class="QLineEdit" name="fileDelete"/>
-           </item>
-           <item>
-            <widget class="QPushButton" name="deleteFileButton">
-             <property name="text">
-              <string>Удалить файл</string>
-             </property>
-            </widget>
-           </item>
-          </layout>
-         </item>
-         <item row="0" column="1">
-          <layout class="QVBoxLayout" name="verticalLayout_3">
-           <item>
-            <widget class="QLineEdit" name="createFile"/>
-           </item>
-           <item>
-            <widget class="QPushButton" name="createFileButton">
-             <property name="text">
-              <string>Создать файл</string>
-             </property>
-            </widget>
-           </item>
-          </layout>
-         </item>
-        </layout>
-       </item>
-      </layout>
-     </item>
-    </layout>
-   </widget>
    <widget class="QWidget" name="layoutWidget">
     <property name="geometry">
      <rect>
       <x>50</x>
-      <y>30</y>
-      <width>571</width>
+      <y>50</y>
+      <width>591</width>
       <height>601</height>
      </rect>
     </property>
     <layout class="QVBoxLayout" name="fileListLayout">
+     <property name="sizeConstraint">
+      <enum>QLayout::SetMaximumSize</enum>
+     </property>
      <item>
       <layout class="QVBoxLayout" name="infoLabels">
        <item>
@@ -110,13 +38,6 @@
            </property>
           </widget>
          </item>
-         <item row="1" column="0">
-          <widget class="QLabel" name="roleLabel">
-           <property name="text">
-            <string>Роль</string>
-           </property>
-          </widget>
-         </item>
          <item row="0" column="1">
           <widget class="QLineEdit" name="usernameLine">
            <property name="readOnly">
@@ -124,8 +45,21 @@
            </property>
           </widget>
          </item>
+         <item row="1" column="0">
+          <widget class="QLabel" name="roleLabel">
+           <property name="text">
+            <string>Роль</string>
+           </property>
+          </widget>
+         </item>
          <item row="1" column="1">
           <widget class="QLineEdit" name="roleLine">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
            <property name="readOnly">
             <bool>true</bool>
            </property>
@@ -159,13 +93,98 @@
      </item>
     </layout>
    </widget>
+   <widget class="QWidget" name="layoutWidget">
+    <property name="geometry">
+     <rect>
+      <x>650</x>
+      <y>50</y>
+      <width>371</width>
+      <height>601</height>
+     </rect>
+    </property>
+    <layout class="QVBoxLayout" name="infoLayout">
+     <property name="sizeConstraint">
+      <enum>QLayout::SetFixedSize</enum>
+     </property>
+     <item>
+      <widget class="QTableView" name="usersList">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>300</width>
+         <height>300</height>
+        </size>
+       </property>
+       <property name="showGrid">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QGroupBox" name="buttonsGroupBox">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+         <horstretch>100</horstretch>
+         <verstretch>123</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>100</width>
+         <height>100</height>
+        </size>
+       </property>
+       <property name="maximumSize">
+        <size>
+         <width>500</width>
+         <height>500</height>
+        </size>
+       </property>
+       <property name="title">
+        <string>Действия</string>
+       </property>
+       <layout class="QVBoxLayout" name="verticalLayout_4">
+        <item>
+         <layout class="QVBoxLayout" name="formLayout">
+          <item>
+           <widget class="QLineEdit" name="dirCreateLine"/>
+          </item>
+          <item>
+           <widget class="QPushButton" name="dirCreateButton">
+            <property name="text">
+             <string>Создать директорию</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLineEdit" name="createFile"/>
+          </item>
+          <item>
+           <widget class="QPushButton" name="createFileButton">
+            <property name="text">
+             <string>Создать файл</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </widget>
+     </item>
+    </layout>
+   </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>984</width>
+     <width>1069</width>
      <height>20</height>
     </rect>
    </property>

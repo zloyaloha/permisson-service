@@ -58,13 +58,13 @@ struct FileInfo {
     bool canExec;
 };
 
-class FileTreeHandler {
-public:
-    FileTreeHandler() = default;
-
-    QJsonObject generateFileTree(const pqxx::result& result);
-private:
-    void addFileToTree(QJsonArray& parentArray, const QStringList& pathComponents, const FileInfo& file);
+class JsonHandler {
+    public:
+        JsonHandler() = default;
+        QJsonObject GenerateFileTree(const pqxx::result& result);
+        QJsonObject GenerateUsersList(const pqxx::result& result);
+    private:
+        void AddFileToTree(QJsonArray& parentArray, const QStringList& pathComponents, const FileInfo& file);
 };
 
 class Observable {
@@ -98,10 +98,12 @@ class Worker : public std::enable_shared_from_this<Worker>, public Observable {
         std::string CreateDir(const std::string& username, const std::string& path, const std::string& filename);
         std::string DeleteFile(const std::string& username, const std::string& filename);
         std::string GetFileList();
+        std::string GetUsersList();
         void Quit(const std::string& token);
     private:
         bool ValidateRequest(const std::string& username, const std::string& token);
         std::string GetToken(const std::string& username);
+        void StopActiveSession();
         std::string GetRole(const std::string& username);
         std::string CreateSession(const int user_id);
         std::string GenerateSalt(std::size_t size = 16) const; // bytes
@@ -114,7 +116,7 @@ class Worker : public std::enable_shared_from_this<Worker>, public Observable {
         std::pair<std::string, std::string> GetPairQueryResult(const pqxx::result& result) const;
         pqxx::result MakeQuery(const std::string& query);
     private:
-        FileTreeHandler _treeHandler;
+        JsonHandler _jsonHandler;
         ThreadPool& _threadPool;
         std::unique_ptr<pqxx::connection> _connection;
         std::shared_ptr<tcp::socket> _socket;

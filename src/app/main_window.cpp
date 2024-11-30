@@ -1,16 +1,19 @@
 #include "main_window.h"
 
-MainWindow::MainWindow(std::shared_ptr<CommandHandler> commandor, QWidget *parent)
-    : QMainWindow(parent), ui(new Ui::MainWindow), _commandHandler(commandor), _treeHandler(std::make_shared<JsonTreeHandler>())
+MainWindow::MainWindow(std::shared_ptr<CommandHandler> commandor, QWidget *parent): 
+    QMainWindow(parent), ui(new Ui::MainWindow), 
+    _commandHandler(commandor), _treeHandler(std::make_shared<JsonTreeHandler>()), _usersListHandler(std::make_shared<JsonUserListHandler>())
 {
     ui->setupUi(this);
     ui->listTree->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(_commandHandler.get(), &CommandHandler::GetRoleMessageReceived, this, &MainWindow::OnRoleMessageReceived);
     connect(_commandHandler.get(), &CommandHandler::UpdateFileList, this, &MainWindow::OnUpdateFileList);
+    connect(_commandHandler.get(), &CommandHandler::FileDeleted, this, &MainWindow::OnFileDeleted);
+    connect(_commandHandler.get(), &CommandHandler::GetUsersList, this, &MainWindow::OnGetUsersList);
     connect(ui->createFileButton, &QPushButton::clicked, this, &MainWindow::CreateFileButtonClicked);
     connect(ui->dirCreateButton, &QPushButton::clicked, this, &MainWindow::CreateDirButtonClicked);
     connect(ui->listTree, SIGNAL(customContextMenuRequested(QPoint)), SLOT(ShowContextMenu(QPoint)));
-
+    ui->listTree->setEditTriggers(QAbstractItemView::NoEditTriggers);
     QFile file(":/styles/styles.qss");
 
     if (file.open(QFile::ReadOnly | QFile::Text)) {
@@ -64,19 +67,88 @@ void MainWindow::CreateDirButtonClicked() {
     }
 }
 
-
 void MainWindow::OnRoleMessageReceived(const QString& message) {
     ui->roleLine->setText(message);
+    if (message == "common") {
+        ui->usersList->hide();
+    } else if (message == "admin") {
+        _commandHandler->SendCommand(Operation::GetUsersList, {_username, _token});
+    }
 }
 
 void MainWindow::OnUpdateFileList(const QString& message) {
-    std::cout << "files updated" << std::endl;
     QJsonDocument jsonDocument = QJsonDocument::fromJson(message.toUtf8());
     if (jsonDocument.isNull()) {
         qWarning("Failed to parse JSON.");
         return ;
     }
     _treeHandler->LoadJsonToTreeView(ui->listTree, jsonDocument);
+}
+
+void MainWindow::OnFileDeleted(const QString& message) {
+    if (message == "Denied") {
+        QMessageBox::warning(this, "Delete", "Permission denied");
+    } else if (message == "Success") {
+        _commandHandler->SendCommand(Operation::GetFileList, {_username, _token});
+    }
+}
+
+void MainWindow::OnGetUsersList(const QString& response) {
+    QJsonDocument jsonDocument = QJsonDocument::fromJson(response.toUtf8());
+    if (jsonDocument.isNull()) {
+        qWarning("Failed to parse JSON.");
+        return ;
+    }
+    _usersListHandler->LoadJsonToTableView(ui->usersList, jsonDocument);
+}
+
+void JsonUserListHandler::LoadJsonToTableView(QTableView* usersListView, const QJsonDocument& jsonDocument) {
+    if (usersModel) {
+        delete usersModel;
+    }
+    usersModel = new QStandardItemModel(usersListView);
+    usersModel->setHorizontalHeaderLabels({"Username", "Role", "Active"});
+    if (jsonDocument.isObject()) {
+        QJsonObject rootObject = jsonDocument.object();
+        QJsonValue usersValue = rootObject.value("users");
+        if (usersValue.isArray()) {
+            QJsonArray usersArray = usersValue.toArray();
+            for (const QJsonValue& user : usersArray) {
+                if (user.isObject()) {
+                    AddUser(user.toObject());
+                }
+            }
+        }
+    }
+    std::cout << "made?" << std::endl;
+    usersListView->setModel(usersModel);
+    usersListView->resizeColumnsToContents();
+    usersListView->horizontalHeader()->setStretchLastSection(true);
+    usersListView->show();
+}
+
+void JsonUserListHandler::AddUser(const QJsonObject& user) {
+    QJsonValue nameValue = user.value("username");
+    QJsonValue isAdminValue = user.value("is_admin");
+    QJsonValue isActiveValue = user.value("is_active");
+
+    QString username = nameValue.toString();
+    QString role = isAdminValue.toBool() ? "Admin" : "User";
+    QString activeStatus = isActiveValue.toBool() ? "Active" : "Inactive";
+
+    QStandardItem* usernameItem = new QStandardItem(username);
+    QStandardItem* isAdminItem = new QStandardItem(role);
+    QStandardItem* isActiveItem = new QStandardItem(activeStatus);
+
+    usersModel->appendRow({usernameItem, isAdminItem, isActiveItem});
+}
+
+JsonUserListHandler::JsonUserListHandler() : usersModel(nullptr) {}
+
+JsonUserListHandler::~JsonUserListHandler() {
+    if (usersModel) {
+        delete usersModel;
+    }
 }
 
 void JsonTreeHandler::LoadJsonToTreeView(QTreeView* treeView, const QJsonDocument& jsonDocument) {
@@ -170,7 +242,6 @@ void MainWindow::NeedUpdateFileList() {
 
 void MainWindow::DeleteFile(const QString& filename) {
     std::string file = filename.toStdString();
-    std::cout << "delete file " << file << std::endl;
     _commandHandler->SendCommand(Operation::DeleteFile, {_username, _token, file});
 }
 

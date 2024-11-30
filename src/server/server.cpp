@@ -22,7 +22,6 @@ Session::Session(std::shared_ptr<tcp::socket> socket, std::vector<std::shared_pt
     : _socket(std::move(socket)), _threadPool(threadPool), _worker(std::make_shared<Worker>(threadPool, _socket, _observers)), Observable(observers) {}
 
 void Session::Start() {
-    // _data.resize(BUFFER_SIZE);
     ReadMessage();
 }
 
@@ -45,7 +44,7 @@ void Session::ReadMessage() {
                         _socket->close();
                         return;
                     }
-                    NotifyObservers("Сообщение получено\n" + std::to_string(command._op));
+                    NotifyObservers("Сообщение получено\n");
                     _threadPool.EnqueueTask([this, command] { _worker->ProccessOperation(command); });
                     ReadMessage();
                 } catch (...) {
@@ -73,16 +72,24 @@ pqxx::result Worker::MakeQuery(const std::string& query) {
 }
 
 Worker::Worker(ThreadPool& threadPool, std::shared_ptr<tcp::socket> socket, std::vector<std::shared_ptr<IServerObserver>>& observers) 
-    : _threadPool(threadPool), _socket(socket), Observable(observers), _connection(std::make_unique<pqxx::connection>(PARAM_STRING)) {}
+    : _threadPool(threadPool), _socket(socket), Observable(observers), _connection(std::make_unique<pqxx::connection>(PARAM_STRING)) {
+        StopActiveSession();
+    }
+
+void Worker::StopActiveSession() {
+    try {
+        pqxx::work work(*_connection);
+        pqxx::result result = work.exec("SELECT permission_app.DeleteActiveSessions();");
+        work.commit();
+    } catch (std::string error) {
+        NotifyObservers("Error: " + error);
+    }
+}
 
 void Worker::SendResponse(const Operation op, const std::initializer_list<std::string>& data) {
     auto self(shared_from_this());
     BaseCommand msg(op, getpid(), data);
     std::string abc = msg.toPacket();
-    for (auto byte: abc) {
-        std::cout << byte << ' ';
-    }
-    std::cout << std::endl;
     boost::asio::async_write(*_socket, boost::asio::buffer(msg.toPacket()),
         [this, self](boost::system::error_code ec, std::size_t writed) {
             if (ec) {
@@ -167,12 +174,12 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             SendResponse(command._op, {result});
             break;
         case Operation::DeleteFile:
-            NotifyObservers("Delete file " + command._msg_data[3]); // filename
+            NotifyObservers("Delete file " + command._msg_data[2]); // filename
             if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
                 NotifyObservers("Security warning");
                 break;
             }
-            result = DeleteFile(command._msg_data[0], command._msg_data[3]);
+            result = DeleteFile(command._msg_data[0], command._msg_data[2]);
             SendResponse(command._op, {result});
             break;
         case Operation::GetFileList:
@@ -184,19 +191,46 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             result = GetFileList();
             SendResponse(command._op, {result});
             break;
+        case Operation::GetUsersList:
+            NotifyObservers("GetUsersList file " + command._msg_data[0]); // username
+            if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
+                NotifyObservers("Security warning");
+                break;
+            }
+            result = GetUsersList();
+            SendResponse(command._op, {result});
+            break;
     }
 }
 
-std::string Worker::DeleteFile(const std::string& username, const std::string& filename) {
+std::string Worker::GetUsersList() {
+    std::string output;
+    pqxx::work work(*_connection);
     try {
-        pqxx::work work(*_connection);
-        pqxx::result result = work.exec("SELECT permission_app.DeleteFileByNameAndUser(" + work.quote(username) + ", " + work.quote(filename) + ");");
-        work.commit();
-        return GetStringQueryResult(result);
+        pqxx::result result = work.exec("SELECT * FROM permission_app.GetUsersWithStatus();");
+        QJsonObject usersList = _jsonHandler.GenerateUsersList(result);
+        QJsonDocument doc(usersList);
+        output = doc.toJson(QJsonDocument::Compact).toStdString();
     } catch (std::string error) {
         NotifyObservers("Error: " + error);
         return "Error";
     }
+    work.commit();
+    return output;
+}
+
+std::string Worker::DeleteFile(const std::string& username, const std::string& filename) {
+    std::string output;
+    pqxx::work work(*_connection);
+    try {
+        pqxx::result result = work.exec("SELECT permission_app.DeleteFileByNameAndUser(" + work.quote(username) + ", " + work.quote(filename) + ");");
+        output = GetStringQueryResult(result);
+    } catch (std::string error) {
+        NotifyObservers("Error: " + error);
+        return "Error";
+    }
+    work.commit();
+    return output;
 }
 
 std::string Worker::GetFileList() {
@@ -204,9 +238,8 @@ std::string Worker::GetFileList() {
         pqxx::work work(*_connection);
         pqxx::result result = work.exec("SELECT * FROM permission_app.GetFileTreeWithPermissions();");
         work.commit();
-        QJsonObject jsonTree = _treeHandler.generateFileTree(result);
+        QJsonObject jsonTree = _jsonHandler.GenerateFileTree(result);
         QJsonDocument doc(jsonTree);
-        std::cout <<  doc.toJson().toStdString() << '\n' << doc.toJson(QJsonDocument::Compact).toStdString().size() << std::endl;
         return doc.toJson(QJsonDocument::Compact).toStdString();
     } catch (std::string error) {
         NotifyObservers("Error: " + error);
@@ -419,31 +452,31 @@ void ServerTerminalObserver::Notify(const std::tm* time, const std::string& str)
     std::cout << std::put_time(time, "%d-%m-%Y %H:%M:%S") << '\t' << str << std::endl;
 }
 
- QJsonObject FileTreeHandler::generateFileTree(const pqxx::result& result) {
-        QJsonObject root;
-        QJsonArray fileSystem;
+QJsonObject JsonHandler::GenerateFileTree(const pqxx::result& result) {
+    QJsonObject root;
+    QJsonArray fileSystem;
 
-        for (const auto& row : result) {
-            FileInfo file;
-            file.path = QString::fromStdString(row["path"].c_str());
-            QStringList pathComponents = file.path.split('/');
-            file.fileName = QString::fromStdString(row["name"].c_str());
-            file.fileType = QString::fromStdString(row["type"].c_str());
-            file.userName = QString::fromStdString(row["owner_name"].c_str());
-            file.groupName = QString::fromStdString(row["group_name"].c_str());
-            file.canRead = row["can_read"].as<bool>();
-            file.canWrite = row["can_write"].as<bool>();
-            file.canExec = row["can_exec"].as<bool>();
-            file.userName = QString::fromStdString(row["owner_name"].c_str());
-            file.groupName = QString::fromStdString(row["group_name"].c_str());
-            addFileToTree(fileSystem, pathComponents, file);
-        }
-
-        root["file_system"] = fileSystem;
-        return root;
+    for (const auto& row : result) {
+        FileInfo file;
+        file.path = QString::fromStdString(row["path"].c_str());
+        QStringList pathComponents = file.path.split('/');
+        file.fileName = QString::fromStdString(row["name"].c_str());
+        file.fileType = QString::fromStdString(row["type"].c_str());
+        file.userName = QString::fromStdString(row["owner_name"].c_str());
+        file.groupName = QString::fromStdString(row["group_name"].c_str());
+        file.canRead = row["can_read"].as<bool>();
+        file.canWrite = row["can_write"].as<bool>();
+        file.canExec = row["can_exec"].as<bool>();
+        file.userName = QString::fromStdString(row["owner_name"].c_str());
+        file.groupName = QString::fromStdString(row["group_name"].c_str());
+        AddFileToTree(fileSystem, pathComponents, file);
     }
 
-void FileTreeHandler::addFileToTree(QJsonArray& parentArray, const QStringList& pathComponents, const FileInfo& file) {
+    root["file_system"] = fileSystem;
+    return root;
+}
+
+void JsonHandler::AddFileToTree(QJsonArray& parentArray, const QStringList& pathComponents, const FileInfo& file) {
 
     if (pathComponents.isEmpty()) {
         return;
@@ -479,10 +512,26 @@ void FileTreeHandler::addFileToTree(QJsonArray& parentArray, const QStringList& 
     // Если есть оставшиеся компоненты пути, рекурсивно создаем вложенные узлы
     if (pathComponents.size() > 1) {
         QJsonArray filesArray = currentNode["files"].toArray();
-        addFileToTree(filesArray, pathComponents.mid(1), file);
+        AddFileToTree(filesArray, pathComponents.mid(1), file);
         currentNode["files"] = filesArray;
     }
 
     // Возвращаем обновленный узел в массив
     parentArray.append(currentNode);
+}
+
+QJsonObject JsonHandler::GenerateUsersList(const pqxx::result& result) {
+    QJsonObject root;
+    QJsonArray list;
+
+    for (const auto& row : result) {
+        QJsonObject obj;
+        obj["username"] = QString::fromStdString(row["login"].c_str());
+        obj["is_admin"] = row["is_admin"].as<bool>();
+        obj["is_active"] = row["is_active"].as<bool>();
+        list.append(obj);
+    }
+
+    root["users"] = list;
+    return root;
 }
