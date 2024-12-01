@@ -83,6 +83,12 @@ void CommandHandler::HandleMessage(const BaseCommand& command) {
         case Operation::GetUsersList:
             emit GetUsersList(QString::fromStdString(command._msg_data[0]));
             break;
+        case Operation::GetGroupsList:
+            emit GetGroupsList(QString::fromStdString(command._msg_data[0]));
+            break;
+        case Operation::AddUserToGroup:
+            emit AddUserToGroup(QString::fromStdString(command._msg_data[0]));
+            break;
         default:
             break;
     }

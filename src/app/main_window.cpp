@@ -2,23 +2,32 @@
 
 MainWindow::MainWindow(std::shared_ptr<CommandHandler> commandor, QWidget *parent): 
     QMainWindow(parent), ui(new Ui::MainWindow), 
-    _commandHandler(commandor), _treeHandler(std::make_shared<JsonTreeHandler>()), _usersListHandler(std::make_shared<JsonUserListHandler>())
+    _commandHandler(commandor), _treeHandler(std::make_shared<JsonTreeHandler>()), _usersListHandler(std::make_shared<JsonUserListHandler>()),
+    _groupsTreeHandler(std::make_shared<JsonGroupTreeHandler>())
 {
     ui->setupUi(this);
     ui->listTree->setContextMenuPolicy(Qt::CustomContextMenu);
+    ui->groupsTree->setContextMenuPolicy(Qt::CustomContextMenu);
+
     connect(_commandHandler.get(), &CommandHandler::GetRoleMessageReceived, this, &MainWindow::OnRoleMessageReceived);
     connect(_commandHandler.get(), &CommandHandler::UpdateFileList, this, &MainWindow::OnUpdateFileList);
     connect(_commandHandler.get(), &CommandHandler::FileDeleted, this, &MainWindow::OnFileDeleted);
     connect(_commandHandler.get(), &CommandHandler::GetUsersList, this, &MainWindow::OnGetUsersList);
+    connect(_commandHandler.get(), &CommandHandler::GetGroupsList, this, &MainWindow::OnGetGroupsList);
+    connect(_commandHandler.get(), &CommandHandler::AddUserToGroup, this, &MainWindow::OnAddUserToGroup);
     connect(ui->createFileButton, &QPushButton::clicked, this, &MainWindow::CreateFileButtonClicked);
     connect(ui->dirCreateButton, &QPushButton::clicked, this, &MainWindow::CreateDirButtonClicked);
     connect(ui->listTree, SIGNAL(customContextMenuRequested(QPoint)), SLOT(ShowContextMenu(QPoint)));
+    connect(ui->groupsTree, &QTreeView::customContextMenuRequested, this, &MainWindow::ShowContextMenuGroups);
+
+
     ui->listTree->setEditTriggers(QAbstractItemView::NoEditTriggers);
     QFile file(":/styles/styles.qss");
 
     if (file.open(QFile::ReadOnly | QFile::Text)) {
         QString styleSheet = QLatin1String(file.readAll());
         ui->listTree->setStyleSheet(styleSheet);
+        ui->groupsTree->setStyleSheet(styleSheet);
         file.close();
     } else {
         qWarning() << "Failed to load stylesheet from";
@@ -26,9 +35,7 @@ MainWindow::MainWindow(std::shared_ptr<CommandHandler> commandor, QWidget *paren
 
 }
 
-MainWindow::~MainWindow() {
-    std::cout << "плохо" << std::endl;
-}
+MainWindow::~MainWindow() {}
 
 void MainWindow::SetupWindow(const QString& username, const QString& token) {
     _token = token.toStdString();
@@ -73,6 +80,15 @@ void MainWindow::OnRoleMessageReceived(const QString& message) {
         ui->usersList->hide();
     } else if (message == "admin") {
         _commandHandler->SendCommand(Operation::GetUsersList, {_username, _token});
+        _commandHandler->SendCommand(Operation::GetGroupsList, {_username, _token});
+    }
+}
+
+void MainWindow::OnAddUserToGroup(const QString& message) {
+    if (message == "Success") {
+        _commandHandler->SendCommand(Operation::GetGroupsList, {_username, _token});
+    } else if (message == "User Not Found") {
+        ui->statusbar->showMessage("User with this login isn't exist");
     }
 }
 
@@ -102,6 +118,16 @@ void MainWindow::OnGetUsersList(const QString& response) {
     _usersListHandler->LoadJsonToTableView(ui->usersList, jsonDocument);
 }
 
+
+void MainWindow::OnGetGroupsList(const QString& response) {
+    QJsonDocument jsonDocument = QJsonDocument::fromJson(response.toUtf8());
+    if (jsonDocument.isNull()) {
+        qWarning("Failed to parse JSON.");
+        return ;
+    }
+    _groupsTreeHandler->LoadJsonToTreeView(ui->groupsTree, jsonDocument);
+}
+
 void JsonUserListHandler::LoadJsonToTableView(QTableView* usersListView, const QJsonDocument& jsonDocument) {
     if (usersModel) {
         delete usersModel;
@@ -120,7 +146,6 @@ void JsonUserListHandler::LoadJsonToTableView(QTableView* usersListView, const Q
             }
         }
     }
-    std::cout << "made?" << std::endl;
     usersListView->setModel(usersModel);
     usersListView->resizeColumnsToContents();
     usersListView->horizontalHeader()->setStretchLastSection(true);
@@ -236,6 +261,51 @@ void MainWindow::ShowContextMenu(const QPoint& pos) {
     menu->popup(ui->listTree->viewport()->mapToGlobal(pos));
 }
 
+void MainWindow::ShowContextMenuGroups(const QPoint& pos) {
+    QModelIndex index = ui->groupsTree->indexAt(pos);
+    if (!index.isValid()) return;
+
+    if (index.column() == 0) {
+        QMenu contextMenu;
+        QAction* addUser = contextMenu.addAction("Добавить пользователя");
+        QAction* deleteUser = contextMenu.addAction("Удалить группу");
+
+        connect(addUser, &QAction::triggered, this, [this, index]() {
+            std::string groupName = index.data().toString().toStdString();
+
+            QDialog dialog(this);
+            dialog.setWindowTitle("Добавление пользователя");
+
+            QVBoxLayout* layout = new QVBoxLayout(&dialog);
+
+            QLabel* label = new QLabel("Введите имя пользователя", &dialog);
+            layout->addWidget(label);
+
+            QLineEdit* lineEdit = new QLineEdit(&dialog);
+            layout->addWidget(lineEdit);
+
+            QPushButton* submitButton = new QPushButton("Подтвердить", &dialog);
+            layout->addWidget(submitButton);
+
+            connect(submitButton, &QPushButton::clicked, &dialog, [&dialog, lineEdit, groupName, this]() {
+                QString enteredUser = lineEdit->text();
+                if (!enteredUser.isEmpty()) {
+                    _commandHandler->SendCommand(Operation::AddUserToGroup, {_username, _token, groupName, enteredUser.toStdString()});
+                }
+                dialog.accept();
+            });
+
+            dialog.setLayout(layout);
+            dialog.exec();
+        });
+        // connect(action2, &QAction::triggered, this, []() {
+        //     qDebug() << "Action 2 triggered!";
+        // });
+
+        contextMenu.exec(ui->groupsTree->viewport()->mapToGlobal(pos));
+    }
+}
+
 void MainWindow::NeedUpdateFileList() {
     _commandHandler->SendCommand(Operation::GetFileList, {_username, _token});
 }
@@ -250,6 +320,63 @@ JsonTreeHandler::JsonTreeHandler() : model(nullptr) {}
 JsonTreeHandler::~JsonTreeHandler() {
     if (model) {
         delete model;
+    }
+}
+
+void JsonGroupTreeHandler::LoadJsonToTreeView(QTreeView* groupTreeView, const QJsonDocument& jsonDocument) {
+    if (groupsModel) {
+        delete groupsModel;
+    }
+    groupsModel = new QStandardItemModel(groupTreeView);
+    groupsModel->setHorizontalHeaderLabels({"Group Name", "User"});
+    if (jsonDocument.isObject()) {
+        QJsonObject rootObject = jsonDocument.object();
+        QJsonValue groupsValue = rootObject.value("groups");
+        if (groupsValue.isArray()) {
+            QJsonArray groupsArray = groupsValue.toArray();
+            for (const QJsonValue& group: groupsArray) {
+                if (group.isObject()) {
+                    AddGroup(group.toObject());
+                }
+            }
+        }
+    }
+    groupTreeView->setModel(groupsModel);
+    groupTreeView->expandAll();
+    groupTreeView->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
+}
+
+void JsonGroupTreeHandler::AddGroup(const QJsonObject& group) {
+    QJsonValue nameValue = group.value("group_name");
+    QString groupName = nameValue.toString();
+
+    QStandardItem* groupItem = new QStandardItem(groupName);
+    QStandardItem* emptyItem = new QStandardItem();
+
+    groupsModel->appendRow({groupItem, emptyItem});
+
+    QJsonValue usersValue = group.value("users");
+    if (usersValue.isArray()) {
+        QJsonArray usersArray = usersValue.toArray();
+        for (const QJsonValue& user : usersArray) {
+            if (user.isObject()) {
+                QJsonObject userObject = user.toObject();
+                QString username = userObject.value("username").toString();
+
+                QStandardItem* userGroupItem = new QStandardItem();
+                QStandardItem* userItem = new QStandardItem(username);
+
+                groupItem->appendRow({userGroupItem, userItem});
+            }
+        }
+    }
+}
+
+JsonGroupTreeHandler::JsonGroupTreeHandler() : groupsModel(nullptr) {}
+
+JsonGroupTreeHandler::~JsonGroupTreeHandler() {
+    if (groupsModel) {
+        delete groupsModel;
     }
 }
 

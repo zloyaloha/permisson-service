@@ -19,7 +19,9 @@ enum Operation {
     GetFileList,
     CreateDir,
     DeleteFile,
-    GetUsersList
+    GetUsersList,
+    GetGroupsList,
+    AddUserToGroup
 };
 
 class BaseCommand {

@@ -103,8 +103,6 @@ void Worker::SendResponse(const Operation op, const std::initializer_list<std::s
 
 bool Worker::ValidateRequest(const std::string& username, const std::string& token) {
     std::string userToken = GetToken(username);
-    std::cout << userToken.size() << ' ' << token.size() << std::endl;
-    std::cout << userToken << '\n' << token << std::endl;
     if (userToken == token) {
         return true;
     }
@@ -192,7 +190,7 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             SendResponse(command._op, {result});
             break;
         case Operation::GetUsersList:
-            NotifyObservers("GetUsersList file " + command._msg_data[0]); // username
+            NotifyObservers("GetUsersList " + command._msg_data[0]); // username
             if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
                 NotifyObservers("Security warning");
                 break;
@@ -200,7 +198,55 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             result = GetUsersList();
             SendResponse(command._op, {result});
             break;
+        case Operation::GetGroupsList:
+            NotifyObservers("GetGroupsList " + command._msg_data[0]); // username
+            if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
+                NotifyObservers("Security warning");
+                break;
+            }
+            result = GetGroupsList();
+            SendResponse(command._op, {result});
+            break;
+        case Operation::AddUserToGroup:
+            NotifyObservers("AddUserToGroup " + command._msg_data[2]); // group
+            if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // acceptor username, token
+                NotifyObservers("Security warning");
+                break;
+            }
+            result = AddUserToGroup(command._msg_data[2], command._msg_data[3]); // group, username
+            SendResponse(command._op, {result});
+            break;
     }
+}
+
+std::string Worker::AddUserToGroup(const std::string& groupName, const std::string& userName) {
+    std::string output;
+    pqxx::work work(*_connection);
+    try {
+        pqxx::result result = work.exec("SELECT permission_app.AddUserToGroup(" + work.quote(groupName) + ", " + work.quote(userName) + ");");
+        output = GetStringQueryResult(result);
+    } catch (std::string error) {
+        NotifyObservers("Error: " + error);
+        return "Error";
+    }
+    work.commit();
+    return output;
+}
+
+std::string Worker::GetGroupsList() {
+    std::string output;
+    pqxx::work work(*_connection);
+    try {
+        pqxx::result result = work.exec("SELECT * FROM permission_app.GetGroupList();");
+        QJsonObject groupsList = _jsonHandler.GenerateGroupsList(result);
+        QJsonDocument doc(groupsList);
+        output = doc.toJson(QJsonDocument::Compact).toStdString();
+    } catch (std::string error) {
+        NotifyObservers("Error: " + error);
+        return "Error";
+    }
+    work.commit();
+    return output;
 }
 
 std::string Worker::GetUsersList() {
@@ -305,7 +351,6 @@ std::string Worker::Login(const std::string& login, const std::string& password)
         return "Invalid username";
     }
     std::pair<std::string, std::string> passwordAndSalt = GetSaltAndPassword(login);
-    std::cout << password << std::endl;
     std::string hashedPassword = HashPassword(password, passwordAndSalt.second);
     if (hashedPassword != passwordAndSalt.first) {
         return "Invalid password";
@@ -534,4 +579,30 @@ QJsonObject JsonHandler::GenerateUsersList(const pqxx::result& result) {
 
     root["users"] = list;
     return root;
+}
+
+QJsonObject JsonHandler::GenerateGroupsList(const pqxx::result& result) {
+    QJsonArray groupsArray;
+
+    for (const auto& row : result) {
+        QJsonObject obj;
+        obj["group_name"] = QString::fromStdString(row["group_name"].c_str());
+        std::string userList = row["user_list"].is_null() ? "" : row["user_list"].c_str();
+        QJsonArray usersArray;
+        if (!userList.empty()) {
+            std::istringstream userStream(userList);
+            std::string username;
+            while (std::getline(userStream, username, ',')) {
+                QJsonObject userObject;
+                userObject["username"] = QString::fromStdString(username);
+                usersArray.append(userObject);
+            }
+        }
+        obj["users"] = usersArray;
+        groupsArray.append(obj);
+    }
+
+    QJsonObject rootObject;
+    rootObject["groups"] = groupsArray;
+    return rootObject;
 }

@@ -21,13 +21,10 @@ public:
     JsonTreeHandler();
     ~JsonTreeHandler();
 
-    // Метод для загрузки JSON в QTreeView
     void LoadJsonToTreeView(QTreeView* treeView, const QJsonDocument& jsonDocument);
-
 private:
     QStandardItemModel* model;
 
-    // Рекурсивная функция для заполнения модели данными из JSON
     void PopulateTree(QStandardItem* parentItem, const QJsonObject& jsonObject);
 };
 
@@ -37,12 +34,23 @@ public:
     ~JsonUserListHandler();
 
     void LoadJsonToTableView(QTableView* tableView, const QJsonDocument& jsonDocument);
-
 private:
     QStandardItemModel* usersModel;
 
     void AddUser(const QJsonObject& jsonObject);
 };
+
+class JsonGroupTreeHandler {
+public:
+    JsonGroupTreeHandler();
+    ~JsonGroupTreeHandler();
+
+    void LoadJsonToTreeView(QTreeView* tableView, const QJsonDocument& jsonDocument);
+private:
+    QStandardItemModel* groupsModel;
+    void AddGroup(const QJsonObject& jsonObject);
+};
+
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -55,16 +63,20 @@ class MainWindow : public QMainWindow {
         void OnUpdateFileList(const QString& role);
         void OnFileDeleted(const QString& response);
         void OnGetUsersList(const QString& response);
+        void OnGetGroupsList(const QString& response);
+        void OnAddUserToGroup(const QString& response);
         void DeleteFile(const QString& filename);
         void NeedUpdateFileList();
     public slots:
         void CreateFileButtonClicked();
         void CreateDirButtonClicked();
         void ShowContextMenu(const QPoint& pos);
+        void ShowContextMenuGroups(const QPoint& pos);
     private:
         std::shared_ptr<CommandHandler> _commandHandler;
         std::shared_ptr<JsonTreeHandler> _treeHandler;
         std::shared_ptr<JsonUserListHandler> _usersListHandler;
+        std::shared_ptr<JsonGroupTreeHandler> _groupsTreeHandler;
         Ui::MainWindow *ui;
         std::string _username;
         std::string _token;
