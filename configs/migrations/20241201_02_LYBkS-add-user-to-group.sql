@@ -13,10 +13,10 @@ BEGIN
     -- Находим user_id по login
     SELECT user_id INTO v_user_id
     FROM permission_app.users
-    WHERE login = p_login;
+    WHERE login = p_login AND root = TRUE;
     
     IF v_user_id IS NULL THEN
-        RETURN 'User Not Found';
+        RETURN 'No access';
     END IF;
 
     SELECT group_id INTO v_group_id
@@ -31,8 +31,8 @@ BEGIN
     VALUES (v_user_id, v_group_id)
     ON CONFLICT (user_id, group_id) DO NOTHING;
 
-    INSERT INTO permission_app.user_events(user_id, directory_id, event)
-    VALUES (requester_id, 'ADD_USER_TO_GROUP', p_login);
+    INSERT INTO permission_app.user_events(user_id, event, description)
+    VALUES (v_user_id, 'ADD_USER_TO_GROUP', p_login);
 
     RETURN 'Success';
 END;

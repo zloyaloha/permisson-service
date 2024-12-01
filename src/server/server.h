@@ -103,6 +103,8 @@ class Worker : public std::enable_shared_from_this<Worker>, public Observable {
         std::string GetGroupsList();
         std::string AddUserToGroup(const std::string& groupName, const std::string& userName);
         std::string CreateGroup(const std::string& groupName, const std::string& userName);
+        std::string DeleteGroup(const std::string& groupName, const std::string& userName);
+        std::string AddFileToGroup(const std::string& fileName, const std::string& groupName, const std::string& userName);
         void Quit(const std::string& token);
     private:
         bool ValidateRequest(const std::string& username, const std::string& token);

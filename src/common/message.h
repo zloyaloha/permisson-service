@@ -23,7 +23,8 @@ enum Operation {
     GetGroupsList,
     AddUserToGroup,
     DeleteGroup,
-    CreateGroup
+    CreateGroup,
+    AddFileToGroup
 };
 
 class BaseCommand {

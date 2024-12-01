@@ -92,6 +92,9 @@ void CommandHandler::HandleMessage(const BaseCommand& command) {
         case Operation::CreateGroup:
             emit CreateGroup(QString::fromStdString(command._msg_data[0]));
             break;
+        case Operation::DeleteGroup:
+            emit DeleteGroup(QString::fromStdString(command._msg_data[0]));
+            break;
         default:
             break;
     }

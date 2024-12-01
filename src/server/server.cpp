@@ -225,16 +225,53 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             result = CreateGroup(command._msg_data[2], command._msg_data[0]); // group, username
             SendResponse(command._op, {result});
             break;
-        // case Operation::DeleteGroup:
-        //     NotifyObservers("DeleteGroup " + command._msg_data[2]); // group
-        //     if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
-        //         NotifyObservers("Security warning");
-        //         break;
-        //     }
-        //     result = DeleteGroup(command._msg_data[2]); // group, username
-        //     SendResponse(command._op, {result});
-        //     break;
+        case Operation::DeleteGroup:
+            NotifyObservers("DeleteGroup " + command._msg_data[2]); // group
+            if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
+                NotifyObservers("Security warning");
+                break;
+            }
+            result = DeleteGroup(command._msg_data[2], command._msg_data[0]); // group, username
+            SendResponse(command._op, {result});
+            break;
+        case Operation::AddFileToGroup:
+            NotifyObservers("AddFileToGroup " + command._msg_data[2] + ' ' + command._msg_data[3]); // file, group
+            if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
+                NotifyObservers("Security warning");
+                break;
+            }
+            result = AddFileToGroup(command._msg_data[2], command._msg_data[3], command._msg_data[0]); // username, file, group
+            SendResponse(command._op, {result});
+            break;
     }
+}
+
+std::string Worker::AddFileToGroup(const std::string& fileName, const std::string& groupName, const std::string& userName) {
+    std::string output;
+    pqxx::work work(*_connection);
+    try {
+        pqxx::result result = work.exec("SELECT permission_app.AddFileToGroup(" + work.quote(fileName) + ", " + work.quote(groupName) + ", " + work.quote(userName) + ");");
+        output = GetStringQueryResult(result);
+    } catch (std::string error) {
+        NotifyObservers("Error: " + error);
+        return "Error";
+    }
+    work.commit();
+    return output;
+}
+
+std::string Worker::DeleteGroup(const std::string& groupName, const std::string& userName) {
+    std::string output;
+    pqxx::work work(*_connection);
+    try {
+        pqxx::result result = work.exec("SELECT permission_app.DeleteGroup(" + work.quote(groupName) + ", " + work.quote(userName) + ");");
+        output = GetStringQueryResult(result);
+    } catch (std::string error) {
+        NotifyObservers("Error: " + error);
+        return "Error";
+    }
+    work.commit();
+    return output;
 }
 
 std::string Worker::CreateGroup(const std::string& groupName, const std::string& userName) {
@@ -545,6 +582,7 @@ QJsonObject JsonHandler::GenerateFileTree(const pqxx::result& result) {
         file.canWrite = row["can_write"].as<bool>();
         file.canExec = row["can_exec"].as<bool>();
         file.userName = QString::fromStdString(row["owner_name"].c_str());
+        std::cout << row["group_name"].c_str() << std::endl;
         file.groupName = QString::fromStdString(row["group_name"].c_str());
         AddFileToTree(fileSystem, pathComponents, file);
     }

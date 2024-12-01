@@ -1,6 +1,7 @@
 #pragma once
 #include "ui_app_win.h"
 #include "command_handler.h"
+#include <map>
 #include <QApplication>
 #include <QWidget>
 #include <QMainWindow>
@@ -66,7 +67,7 @@ class MainWindow : public QMainWindow {
         void OnGetGroupsList(const QString& response);
         void OnAddUserToGroup(const QString& response);
         void OnCreateGroup(const QString& response);
-
+        void OnDeleteGroup(const QString& response);
         void DeleteFile(const QString& filename);
         void NeedUpdateFileList();
     public slots:

@@ -16,6 +16,7 @@ MainWindow::MainWindow(std::shared_ptr<CommandHandler> commandor, QWidget *paren
     connect(_commandHandler.get(), &CommandHandler::GetGroupsList, this, &MainWindow::OnGetGroupsList);
     connect(_commandHandler.get(), &CommandHandler::AddUserToGroup, this, &MainWindow::OnAddUserToGroup);
     connect(_commandHandler.get(), &CommandHandler::CreateGroup, this, &MainWindow::OnCreateGroup);
+    connect(_commandHandler.get(), &CommandHandler::DeleteGroup, this, &MainWindow::OnDeleteGroup);
 
     connect(ui->createFileButton, &QPushButton::clicked, this, &MainWindow::CreateFileButtonClicked);
     connect(ui->dirCreateButton, &QPushButton::clicked, this, &MainWindow::CreateDirButtonClicked);
@@ -65,7 +66,9 @@ void MainWindow::CreateFileButtonClicked() {
 
 void MainWindow::CreateGroupButtonClicked() {
     std::string groupName = ui->groupCreate->text().toStdString();
-    _commandHandler->SendCommand(Operation::CreateGroup, {_username, _token, groupName});
+    if (groupName != "") {
+        _commandHandler->SendCommand(Operation::CreateGroup, {_username, _token, groupName});
+    }
 }
 
 void MainWindow::CreateDirButtonClicked() {
@@ -89,6 +92,14 @@ void MainWindow::OnRoleMessageReceived(const QString& message) {
     } else if (message == "admin") {
         _commandHandler->SendCommand(Operation::GetUsersList, {_username, _token});
         _commandHandler->SendCommand(Operation::GetGroupsList, {_username, _token});
+    }
+}
+
+void MainWindow::OnDeleteGroup(const QString& message) {
+    if (message == "Success") {
+        _commandHandler->SendCommand(Operation::GetGroupsList, {_username, _token});
+    } else if (message == "No access") {
+        ui->statusbar->showMessage("Have not enough rights");
     }
 }
 
@@ -267,14 +278,43 @@ void MainWindow::ShowContextMenu(const QPoint& pos) {
     if (!index.isValid()) {
         return;
     }
+    std::unordered_map<std::string, QAction *> actions;
+    actions.emplace("Update", new QAction(tr("Обновить"), this));
+    actions.emplace("Delete", new QAction(tr("Удалить"), this));
     QMenu* menu = new QMenu(this);
-    QAction* updateFiles = new QAction(tr("Обновить"), this);
-    QAction* deleteFile = new QAction(tr("Удалить"), this);
-    connect(deleteFile, &QAction::triggered, [this, index]() { DeleteFile(index.data(Qt::DisplayRole).toString()); });
-    connect(updateFiles, SIGNAL(triggered()), this, SLOT(NeedUpdateFileList()));
-    menu->addAction(updateFiles);
-    menu->addAction(deleteFile);
-    menu->popup(ui->listTree->viewport()->mapToGlobal(pos));
+    if (index.column() == 0) {
+        actions.emplace("Add", new QAction(tr("Добавить в группу"), this));
+
+        connect(actions["Add"], &QAction::triggered, this, [this, index]() {
+            std::string fileName = index.data().toString().toStdString();
+            QDialog dialog(this);
+            dialog.setWindowTitle("Добавление в группу");
+            QVBoxLayout* layout = new QVBoxLayout(&dialog);
+            QLabel* label = new QLabel("Введите имя группы", &dialog);
+            layout->addWidget(label);
+            QLineEdit* lineEdit = new QLineEdit(&dialog);
+            layout->addWidget(lineEdit);
+            QPushButton* submitButton = new QPushButton("Подтвердить", &dialog);
+            layout->addWidget(submitButton);
+
+            connect(submitButton, &QPushButton::clicked, &dialog, [&dialog, lineEdit, fileName, this]() {
+                QString enteredGroup = lineEdit->text();
+                if (!enteredGroup.isEmpty()) {
+                    _commandHandler->SendCommand(Operation::AddFileToGroup, {_username, _token, fileName, enteredGroup.toStdString()});
+                }
+                dialog.accept();
+            });
+
+            dialog.setLayout(layout);
+            dialog.exec();
+        });
+        menu->addAction(actions["Add"]);
+        connect(actions["Update"], SIGNAL(triggered()), this, SLOT(NeedUpdateFileList()));
+        connect(actions["Delete"], &QAction::triggered, [this, index]() { DeleteFile(index.data(Qt::DisplayRole).toString()); });
+        menu->addAction(actions["Update"]);
+        menu->addAction(actions["Delete"]);
+        menu->popup(ui->listTree->viewport()->mapToGlobal(pos));
+    }
 }
 
 void MainWindow::ShowContextMenuGroups(const QPoint& pos) {

@@ -11,7 +11,7 @@ BEGIN
     -- Получаем user_id пользователя по его имени
     SELECT user_id INTO creator_user_id
     FROM permission_app.users
-    WHERE login = creator_username;
+    WHERE login = creator_username AND root = TRUE;
 
     -- Если пользователь не найден, возвращаем 'User Not Found'
     IF creator_user_id IS NULL THEN

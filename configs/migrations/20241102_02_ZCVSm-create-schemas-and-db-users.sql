@@ -19,3 +19,6 @@ GRANT SELECT, INSERT ON ALL TABLES IN SCHEMA permission_app TO app_user;
 
 GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA permission_app TO app_user;
 
+GRANT SELECT, INSERT, DELETE, UPDATE ON permission_app.groups TO app_user;
+GRANT SELECT, INSERT, DELETE, UPDATE ON permission_app.user_to_group TO app_user;
+GRANT SELECT, INSERT, DELETE, UPDATE ON permission_app.users TO app_user;

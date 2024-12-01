@@ -1,6 +1,6 @@
 -- Create users and group
 -- depends: 
-CREATE TYPE user_event_type AS ENUM ('CREATE_GROUP', 'DELETE_GROUP', 'ADD_USER_TO_GROUP');
+CREATE TYPE user_event_type AS ENUM ('CREATE_GROUP', 'DELETE_GROUP', 'ADD_USER_TO_GROUP', 'ADD_FILE_TO_GROUP');
 
 CREATE TABLE IF NOT EXISTs users (
     user_id SERIAL PRIMARY KEY,
