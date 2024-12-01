@@ -65,11 +65,14 @@ class MainWindow : public QMainWindow {
         void OnGetUsersList(const QString& response);
         void OnGetGroupsList(const QString& response);
         void OnAddUserToGroup(const QString& response);
+        void OnCreateGroup(const QString& response);
+
         void DeleteFile(const QString& filename);
         void NeedUpdateFileList();
     public slots:
         void CreateFileButtonClicked();
         void CreateDirButtonClicked();
+        void CreateGroupButtonClicked();
         void ShowContextMenu(const QPoint& pos);
         void ShowContextMenuGroups(const QPoint& pos);
     private:

@@ -117,7 +117,7 @@
           <property name="minimumSize">
            <size>
             <width>0</width>
-            <height>300</height>
+            <height>270</height>
            </size>
           </property>
          </widget>
@@ -148,6 +148,16 @@
           <layout class="QVBoxLayout" name="verticalLayout_4">
            <item>
             <layout class="QVBoxLayout" name="formLayout">
+             <item>
+              <widget class="QLineEdit" name="groupCreate"/>
+             </item>
+             <item>
+              <widget class="QPushButton" name="groupCreateButton">
+               <property name="text">
+                <string>Создать группу</string>
+               </property>
+              </widget>
+             </item>
              <item>
               <widget class="QLineEdit" name="dirCreateLine"/>
              </item>

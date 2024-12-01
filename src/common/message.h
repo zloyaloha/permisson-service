@@ -21,7 +21,9 @@ enum Operation {
     DeleteFile,
     GetUsersList,
     GetGroupsList,
-    AddUserToGroup
+    AddUserToGroup,
+    DeleteGroup,
+    CreateGroup
 };
 
 class BaseCommand {

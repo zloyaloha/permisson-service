@@ -15,8 +15,11 @@ MainWindow::MainWindow(std::shared_ptr<CommandHandler> commandor, QWidget *paren
     connect(_commandHandler.get(), &CommandHandler::GetUsersList, this, &MainWindow::OnGetUsersList);
     connect(_commandHandler.get(), &CommandHandler::GetGroupsList, this, &MainWindow::OnGetGroupsList);
     connect(_commandHandler.get(), &CommandHandler::AddUserToGroup, this, &MainWindow::OnAddUserToGroup);
+    connect(_commandHandler.get(), &CommandHandler::CreateGroup, this, &MainWindow::OnCreateGroup);
+
     connect(ui->createFileButton, &QPushButton::clicked, this, &MainWindow::CreateFileButtonClicked);
     connect(ui->dirCreateButton, &QPushButton::clicked, this, &MainWindow::CreateDirButtonClicked);
+    connect(ui->groupCreateButton, &QPushButton::clicked, this, &MainWindow::CreateGroupButtonClicked);
     connect(ui->listTree, SIGNAL(customContextMenuRequested(QPoint)), SLOT(ShowContextMenu(QPoint)));
     connect(ui->groupsTree, &QTreeView::customContextMenuRequested, this, &MainWindow::ShowContextMenuGroups);
 
@@ -60,6 +63,11 @@ void MainWindow::CreateFileButtonClicked() {
     }
 }
 
+void MainWindow::CreateGroupButtonClicked() {
+    std::string groupName = ui->groupCreate->text().toStdString();
+    _commandHandler->SendCommand(Operation::CreateGroup, {_username, _token, groupName});
+}
+
 void MainWindow::CreateDirButtonClicked() {
     std::string pathToFile = "root/" + ui->dirCreateLine->text().toStdString();
     size_t lastSlashPos = pathToFile.find_last_of("/\\");
@@ -81,6 +89,14 @@ void MainWindow::OnRoleMessageReceived(const QString& message) {
     } else if (message == "admin") {
         _commandHandler->SendCommand(Operation::GetUsersList, {_username, _token});
         _commandHandler->SendCommand(Operation::GetGroupsList, {_username, _token});
+    }
+}
+
+void MainWindow::OnCreateGroup(const QString& message) {
+    if (message == "Success") {
+        _commandHandler->SendCommand(Operation::GetGroupsList, {_username, _token});
+    } else if (message == "Already Exists") {
+        ui->statusbar->showMessage("Group alredy exists");
     }
 }
 
@@ -265,25 +281,21 @@ void MainWindow::ShowContextMenuGroups(const QPoint& pos) {
     QModelIndex index = ui->groupsTree->indexAt(pos);
     if (!index.isValid()) return;
 
-    if (index.column() == 0) {
+    if (index.column() == 0 && !index.data().toString().isEmpty()) {
         QMenu contextMenu;
         QAction* addUser = contextMenu.addAction("Добавить пользователя");
-        QAction* deleteUser = contextMenu.addAction("Удалить группу");
+        QAction* deleteGroup = contextMenu.addAction("Удалить группу");
 
         connect(addUser, &QAction::triggered, this, [this, index]() {
             std::string groupName = index.data().toString().toStdString();
 
             QDialog dialog(this);
             dialog.setWindowTitle("Добавление пользователя");
-
             QVBoxLayout* layout = new QVBoxLayout(&dialog);
-
             QLabel* label = new QLabel("Введите имя пользователя", &dialog);
             layout->addWidget(label);
-
             QLineEdit* lineEdit = new QLineEdit(&dialog);
             layout->addWidget(lineEdit);
-
             QPushButton* submitButton = new QPushButton("Подтвердить", &dialog);
             layout->addWidget(submitButton);
 
@@ -298,9 +310,11 @@ void MainWindow::ShowContextMenuGroups(const QPoint& pos) {
             dialog.setLayout(layout);
             dialog.exec();
         });
-        // connect(action2, &QAction::triggered, this, []() {
-        //     qDebug() << "Action 2 triggered!";
-        // });
+
+        connect(deleteGroup, &QAction::triggered, this, [this, index]() {
+            std::string groupName = index.data().toString().toStdString();
+            _commandHandler->SendCommand(Operation::DeleteGroup, {_username, _token, groupName});
+        });
 
         contextMenu.exec(ui->groupsTree->viewport()->mapToGlobal(pos));
     }

@@ -9,6 +9,7 @@ CREATE SCHEMA permission_app;
 ALTER TABLE public.users SET SCHEMA permission_app;
 ALTER TABLE public.groups SET SCHEMA permission_app;
 ALTER TABLE public.user_to_group SET SCHEMA permission_app;
+ALTER TABLE public.user_events SET SCHEMA permission_app;
 
 GRANT USAGE ON SCHEMA permission_app TO app_user;
 

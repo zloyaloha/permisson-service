@@ -1,5 +1,6 @@
 -- Create users and group
 -- depends: 
+CREATE TYPE user_event_type AS ENUM ('CREATE_GROUP', 'DELETE_GROUP', 'ADD_USER_TO_GROUP');
 
 CREATE TABLE IF NOT EXISTs users (
     user_id SERIAL PRIMARY KEY,
@@ -20,4 +21,11 @@ CREATE TABLE IF NOT EXISTS user_to_group (
     user_id INTEGER REFERENCES users(user_id),
     group_id INTEGER REFERENCES groups(group_id),
     UNIQUE(group_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS user_events (
+    user_id INTEGER REFERENCES users(user_id),
+    event user_event_type,
+    description VARCHAR(50) DEFAULT '',
+    time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

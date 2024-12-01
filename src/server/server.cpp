@@ -216,7 +216,39 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             result = AddUserToGroup(command._msg_data[2], command._msg_data[3]); // group, username
             SendResponse(command._op, {result});
             break;
+        case Operation::CreateGroup:
+            NotifyObservers("CreateGroup " + command._msg_data[2]); // group
+            if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // acceptor username, token
+                NotifyObservers("Security warning");
+                break;
+            }
+            result = CreateGroup(command._msg_data[2], command._msg_data[0]); // group, username
+            SendResponse(command._op, {result});
+            break;
+        // case Operation::DeleteGroup:
+        //     NotifyObservers("DeleteGroup " + command._msg_data[2]); // group
+        //     if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
+        //         NotifyObservers("Security warning");
+        //         break;
+        //     }
+        //     result = DeleteGroup(command._msg_data[2]); // group, username
+        //     SendResponse(command._op, {result});
+        //     break;
     }
+}
+
+std::string Worker::CreateGroup(const std::string& groupName, const std::string& userName) {
+    std::string output;
+    pqxx::work work(*_connection);
+    try {
+        pqxx::result result = work.exec("SELECT permission_app.CreateGroup(" + work.quote(groupName) + ", " + work.quote(userName) + ");");
+        output = GetStringQueryResult(result);
+    } catch (std::string error) {
+        NotifyObservers("Error: " + error);
+        return "Error";
+    }
+    work.commit();
+    return output;
 }
 
 std::string Worker::AddUserToGroup(const std::string& groupName, const std::string& userName) {

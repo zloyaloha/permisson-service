@@ -89,6 +89,9 @@ void CommandHandler::HandleMessage(const BaseCommand& command) {
         case Operation::AddUserToGroup:
             emit AddUserToGroup(QString::fromStdString(command._msg_data[0]));
             break;
+        case Operation::CreateGroup:
+            emit CreateGroup(QString::fromStdString(command._msg_data[0]));
+            break;
         default:
             break;
     }

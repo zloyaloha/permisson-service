@@ -62,6 +62,9 @@ BEGIN
         SELECT file_id FROM directories_to_delete
     );
 
+    INSERT INTO permission_app.events(user_id, directory_id, event)
+    VALUES (requester_id, new_file_id, 'DELETE');
+
     RETURN 'Success';
 END;
 $$;
