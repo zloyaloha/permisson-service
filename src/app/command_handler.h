@@ -45,4 +45,5 @@ class CommandHandler: public QObject, public std::enable_shared_from_this<Comman
         void AddUserToGroup(const QString& response);
         void CreateGroup(const QString& response);
         void DeleteGroup(const QString& response);
+        void CreateFile(const QString& response);
 };

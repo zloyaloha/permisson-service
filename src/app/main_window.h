@@ -68,6 +68,7 @@ class MainWindow : public QMainWindow {
         void OnAddUserToGroup(const QString& response);
         void OnCreateGroup(const QString& response);
         void OnDeleteGroup(const QString& response);
+        void OnCreateFile(const QString& response);
         void DeleteFile(const QString& filename);
         void NeedUpdateFileList();
     public slots:

@@ -25,14 +25,13 @@ BEGIN
         RETURN 'User not found';
     END IF;
 
-    -- Получаем ID директории и владельцев
-    SELECT n.file_id, p.user_id, p.group_id INTO directory_id, owner_id, owner_group_id
+    -- Получаем ID директории и её владельца и группу
+    SELECT n.file_id, n.owner_id, n.group_id INTO directory_id, owner_id, owner_group_id
     FROM permission_app.nodes n
-    LEFT JOIN permission_app.permissions p ON n.file_id = p.node_id
     WHERE n.name = directory_name;
 
     IF directory_id IS NULL THEN
-        RETURN 'Not found';
+        RETURN 'Directory not found';
     END IF;
 
     -- Проверяем, принадлежит ли пользователь группе-владельцу
@@ -44,28 +43,29 @@ BEGIN
 
     -- Проверка прав пользователя
     IF NOT (requester_id = owner_id OR is_root OR belongs_to_group) THEN
-        RETURN 'Denied';
+        RETURN 'Access denied';
     END IF;
+
+    -- Логируем событие удаления перед удалением данных
+    INSERT INTO permission_app.events (user_id, file_id, event)
+    VALUES (requester_id, directory_id, 'DELETE');
 
     -- Удаление директории и её содержимого рекурсивно
     DELETE FROM permission_app.nodes
     WHERE file_id IN (
-        WITH RECURSIVE directories_to_delete AS (
+        WITH RECURSIVE nodes_to_delete AS (
             SELECT file_id
             FROM permission_app.nodes
             WHERE file_id = directory_id
             UNION ALL
             SELECT n.file_id
             FROM permission_app.nodes n
-            INNER JOIN directories_to_delete dtd ON n.parent_id = dtd.file_id
+            INNER JOIN nodes_to_delete dtd ON n.parent_id = dtd.file_id
         )
-        SELECT file_id FROM directories_to_delete
+        SELECT file_id FROM nodes_to_delete
     );
 
-    INSERT INTO permission_app.events(user_id, directory_id, event)
-    VALUES (requester_id, new_file_id, 'DELETE');
-
-    RETURN 'Success';
+    RETURN 'Directory and contents successfully deleted';
 END;
 $$;
 

@@ -578,12 +578,7 @@ QJsonObject JsonHandler::GenerateFileTree(const pqxx::result& result) {
         file.fileType = QString::fromStdString(row["type"].c_str());
         file.userName = QString::fromStdString(row["owner_name"].c_str());
         file.groupName = QString::fromStdString(row["group_name"].c_str());
-        file.canRead = row["can_read"].as<bool>();
-        file.canWrite = row["can_write"].as<bool>();
-        file.canExec = row["can_exec"].as<bool>();
-        file.userName = QString::fromStdString(row["owner_name"].c_str());
-        std::cout << row["group_name"].c_str() << std::endl;
-        file.groupName = QString::fromStdString(row["group_name"].c_str());
+        file.permissions = QString::fromStdString(row["permissions"].c_str());
         AddFileToTree(fileSystem, pathComponents, file);
     }
 
@@ -618,9 +613,7 @@ void JsonHandler::AddFileToTree(QJsonArray& parentArray, const QStringList& path
         currentNode["path"] = file.path;
         currentNode["userName"] = file.userName;
         currentNode["groupName"] = file.groupName;
-        currentNode["can_read"] = file.canRead ? "t" : "f";
-        currentNode["can_write"] = file.canWrite ? "t" : "f";
-        currentNode["can_exec"] = file.canExec ? "t" : "f";
+        currentNode["permissions"] = file.permissions;
         currentNode["files"] = QJsonArray();
     }
 

@@ -16,6 +16,7 @@ DECLARE
     part TEXT;                 -- Текущая часть пути
     new_dir_id INT;            -- ID новой директории
     username_user_id INT;      -- ID пользователя, который добавляет директорию
+    user_group_id INT;       -- ID группы родительской директории
 BEGIN
     -- Получаем user_id пользователя
     SELECT user_id INTO username_user_id
@@ -33,40 +34,45 @@ BEGIN
     FOREACH part IN ARRAY parts LOOP
         SELECT file_id INTO current_id
         FROM permission_app.nodes
-        WHERE name = part AND type = 'DIR';
+        WHERE name = part AND type = 'DIR' AND (parent_id = parent_id_find OR parent_id IS NULL);
 
-        -- Если узел не найден, прекращаем выполнение
         IF current_id IS NULL THEN
             RAISE NOTICE 'Path % does not exist. Nothing was created.', part;
             RETURN 'Path Error';
         END IF;
 
-        -- Переходим на следующий уровень
         parent_id_find := current_id;
     END LOOP;
+
+    -- Получаем ID группы родительской директории
+    SELECT group_id INTO user_group_id
+    FROM permission_app.groups
+    WHERE name = (username || '_group');
 
     -- Проверяем, существует ли директория с таким именем в указанной директории
     SELECT file_id INTO current_id
     FROM permission_app.nodes
     WHERE name = dir_name AND parent_id = parent_id_find AND type = 'DIR';
 
-    -- Если директории нет, создаем её
     IF current_id IS NULL THEN
+        -- Вставляем новую директорию
         INSERT INTO permission_app.nodes (parent_id, name, type)
-        VALUES (parent_id_find, dir_name, 'DIR');
+        VALUES (parent_id_find, dir_name, 'DIR')
+        RETURNING file_id INTO new_dir_id;
 
-        -- Получаем ID созданной директории
-        SELECT file_id INTO new_dir_id
-        FROM permission_app.nodes
-        WHERE name = dir_name AND parent_id = parent_id_find AND type = 'DIR';
+        -- Устанавливаем права для новой директории
+        INSERT INTO permission_app.permissions_user (node_id, user_id)
+        VALUES (new_dir_id, username_user_id);
 
-        -- Добавляем права для текущего пользователя
-        INSERT INTO permission_app.permissions(node_id, user_id, can_read, can_write)
-        VALUES (new_dir_id, username_user_id, TRUE, TRUE);
+        INSERT INTO permission_app.permissions_group(node_id, group_id)
+        VALUES (new_dir_id, user_group_id);
+
+        INSERT INTO permission_app.permissions_all(node_id)
+        VALUES (new_dir_id);
 
         -- Логируем событие создания директории
-        INSERT INTO permission_app.events(user_id, file_id, event)
-        VALUES (username_user_id, new_dir_id, 'CREATE_FILE');
+        INSERT INTO permission_app.events (user_id, file_id, event)
+        VALUES (username_user_id, new_dir_id, 'CREATE_DIR');
     ELSE
         RETURN 'Directory exists';
     END IF;

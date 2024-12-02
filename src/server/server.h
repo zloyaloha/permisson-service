@@ -53,9 +53,7 @@ struct FileInfo {
     QString fileType;
     QString userName;
     QString groupName;
-    bool canRead;
-    bool canWrite;
-    bool canExec;
+    QString permissions;
 };
 
 class JsonHandler {

@@ -17,6 +17,7 @@ MainWindow::MainWindow(std::shared_ptr<CommandHandler> commandor, QWidget *paren
     connect(_commandHandler.get(), &CommandHandler::AddUserToGroup, this, &MainWindow::OnAddUserToGroup);
     connect(_commandHandler.get(), &CommandHandler::CreateGroup, this, &MainWindow::OnCreateGroup);
     connect(_commandHandler.get(), &CommandHandler::DeleteGroup, this, &MainWindow::OnDeleteGroup);
+    connect(_commandHandler.get(), &CommandHandler::CreateFile, this, &MainWindow::OnCreateFile);
 
     connect(ui->createFileButton, &QPushButton::clicked, this, &MainWindow::CreateFileButtonClicked);
     connect(ui->dirCreateButton, &QPushButton::clicked, this, &MainWindow::CreateDirButtonClicked);
@@ -92,6 +93,15 @@ void MainWindow::OnRoleMessageReceived(const QString& message) {
     } else if (message == "admin") {
         _commandHandler->SendCommand(Operation::GetUsersList, {_username, _token});
         _commandHandler->SendCommand(Operation::GetGroupsList, {_username, _token});
+    }
+}
+
+void MainWindow::OnCreateFile(const QString& message) {
+    qDebug() << message;
+    if (message == "Success") {
+        _commandHandler->SendCommand(Operation::GetFileList, {_username, _token});
+    } else if (message == "No access") {
+        ui->statusbar->showMessage("Have not enough rights");
     }
 }
 
@@ -209,7 +219,7 @@ void JsonTreeHandler::LoadJsonToTreeView(QTreeView* treeView, const QJsonDocumen
     }
 
     model = new QStandardItemModel(treeView);
-    model->setHorizontalHeaderLabels({"Name", "Type", "Owner name", "Group name", "Can Read", "Can Write", "Can Execute"});
+    model->setHorizontalHeaderLabels({"Name", "Type", "Owner name", "Group name", "Permissions"});
 
     QStandardItem* rootItem = model->invisibleRootItem();
 
@@ -237,17 +247,13 @@ void JsonTreeHandler::PopulateTree(QStandardItem* parentItem, const QJsonObject&
     QJsonValue typeValue = jsonObject.value("type");
     QJsonValue userNameValue = jsonObject.value("userName");
     QJsonValue groupNameValue = jsonObject.value("groupName");
-    QJsonValue canReadValue = jsonObject.value("can_read");
-    QJsonValue canWriteValue = jsonObject.value("can_write");
-    QJsonValue canExecValue = jsonObject.value("can_exec");
+    QJsonValue permissionsValue = jsonObject.value("permissions");
 
     QStandardItem* nameItem = new QStandardItem(nameValue.toString());
     QStandardItem* typeItem = new QStandardItem(typeValue.toString());
     QStandardItem* userNameItem = new QStandardItem(userNameValue.toString());
     QStandardItem* groupNameItem = new QStandardItem(groupNameValue.toString());
-    QStandardItem* canReadItem = new QStandardItem(canReadValue.toString());
-    QStandardItem* canWriteItem = new QStandardItem(canWriteValue.toString());
-    QStandardItem* canExecItem = new QStandardItem(canExecValue.toString());
+    QStandardItem* permissions = new QStandardItem(permissionsValue.toString());
 
     QIcon folderIcon(":/icons/folder.png");
     QIcon fileIcon(":/icons/file.png");
@@ -256,7 +262,7 @@ void JsonTreeHandler::PopulateTree(QStandardItem* parentItem, const QJsonObject&
         QStandardItem* folderItem = new QStandardItem(nameValue.toString());
         folderItem->setData("DIR", Qt::UserRole);
         folderItem->setIcon(folderIcon);
-        parentItem->appendRow({folderItem, typeItem, userNameItem, groupNameItem, canReadItem, canWriteItem, canExecItem});
+        parentItem->appendRow({folderItem, typeItem, userNameItem, groupNameItem, permissions});
 
         QJsonValue filesValue = jsonObject.value("files");
         if (filesValue.isArray()) {
@@ -269,7 +275,7 @@ void JsonTreeHandler::PopulateTree(QStandardItem* parentItem, const QJsonObject&
         }
     } else if (typeValue.toString() == "FILE") {
         nameItem->setIcon(fileIcon);
-        parentItem->appendRow({nameItem, typeItem, userNameItem, groupNameItem, canReadItem, canWriteItem, canExecItem});
+        parentItem->appendRow({nameItem, typeItem, userNameItem, groupNameItem, permissions});
     }
 }
 

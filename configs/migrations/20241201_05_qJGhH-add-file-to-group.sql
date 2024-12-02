@@ -52,15 +52,14 @@ BEGIN
     -- Проверяем, существует ли уже запись в таблице permissions
     IF EXISTS (
         SELECT 1
-        FROM permission_app.permissions
+        FROM permission_app.permissions_group
         WHERE node_id = file_id_selected AND group_id = group_id_selected
     ) THEN
         RETURN 'File Already Added';
     END IF;
 
-    UPDATE permission_app.permissions
-    SET group_id = group_id_selected
-    WHERE node_id = file_id_selected;
+    INSERT INTO permission_app.permissions_group (node_id, group_id)
+    VALUES (file_id_selected, group_id_selected);
 
     -- Добавляем событие в таблицу user_events
     INSERT INTO permission_app.user_events (user_id, event, description)

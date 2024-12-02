@@ -72,8 +72,6 @@ void CommandHandler::HandleMessage(const BaseCommand& command) {
         case Operation::GetRole:
             emit GetRoleMessageReceived(QString::fromStdString(command._msg_data[0]));
             break;
-        case Operation::CreateFile:
-            break;
         case Operation::GetFileList:
             emit UpdateFileList(QString::fromStdString(command._msg_data[0])); // json
             break;
@@ -94,6 +92,10 @@ void CommandHandler::HandleMessage(const BaseCommand& command) {
             break;
         case Operation::DeleteGroup:
             emit DeleteGroup(QString::fromStdString(command._msg_data[0]));
+            break;
+        case Operation::CreateFile:
+        case Operation::CreateDir:
+            emit CreateFile(QString::fromStdString(command._msg_data[0]));
             break;
         default:
             break;
