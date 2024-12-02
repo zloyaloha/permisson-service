@@ -11,13 +11,11 @@ MainWindow::MainWindow(std::shared_ptr<CommandHandler> commandor, QWidget *paren
 
     connect(_commandHandler.get(), &CommandHandler::GetRoleMessageReceived, this, &MainWindow::OnRoleMessageReceived);
     connect(_commandHandler.get(), &CommandHandler::UpdateFileList, this, &MainWindow::OnUpdateFileList);
-    connect(_commandHandler.get(), &CommandHandler::FileDeleted, this, &MainWindow::OnFileDeleted);
     connect(_commandHandler.get(), &CommandHandler::GetUsersList, this, &MainWindow::OnGetUsersList);
     connect(_commandHandler.get(), &CommandHandler::GetGroupsList, this, &MainWindow::OnGetGroupsList);
-    connect(_commandHandler.get(), &CommandHandler::AddUserToGroup, this, &MainWindow::OnAddUserToGroup);
-    connect(_commandHandler.get(), &CommandHandler::CreateGroup, this, &MainWindow::OnCreateGroup);
-    connect(_commandHandler.get(), &CommandHandler::DeleteGroup, this, &MainWindow::OnDeleteGroup);
-    connect(_commandHandler.get(), &CommandHandler::CreateFile, this, &MainWindow::OnCreateFile);
+
+    connect(_commandHandler.get(), &CommandHandler::OperationWithFile, this, &MainWindow::OnOperationWithFile);
+    connect(_commandHandler.get(), &CommandHandler::OperationWithGroup, this, &MainWindow::OnOperationWithGroup);
 
     connect(ui->createFileButton, &QPushButton::clicked, this, &MainWindow::CreateFileButtonClicked);
     connect(ui->dirCreateButton, &QPushButton::clicked, this, &MainWindow::CreateDirButtonClicked);
@@ -53,6 +51,9 @@ void MainWindow::SetupWindow(const QString& username, const QString& token) {
 
 void MainWindow::CreateFileButtonClicked() {
     std::string pathToFile = "root/" + ui->createFile->text().toStdString();
+    if (ui->createFile->text().isEmpty()) {
+        return;
+    }
     size_t lastSlashPos = pathToFile.find_last_of("/\\");
     if (lastSlashPos == std::string::npos) {
         std::string path = "";
@@ -74,6 +75,9 @@ void MainWindow::CreateGroupButtonClicked() {
 
 void MainWindow::CreateDirButtonClicked() {
     std::string pathToFile = "root/" + ui->dirCreateLine->text().toStdString();
+    if (ui->dirCreateLine->text().isEmpty()) {
+        return;
+    }
     size_t lastSlashPos = pathToFile.find_last_of("/\\");
     if (lastSlashPos == std::string::npos) {
         std::string path = "";
@@ -96,36 +100,28 @@ void MainWindow::OnRoleMessageReceived(const QString& message) {
     }
 }
 
-void MainWindow::OnCreateFile(const QString& message) {
-    qDebug() << message;
+void MainWindow::OnOperationWithFile(const QString& message) {
     if (message == "Success") {
         _commandHandler->SendCommand(Operation::GetFileList, {_username, _token});
     } else if (message == "No access") {
         ui->statusbar->showMessage("Have not enough rights");
+    } else if (message == "File exists") {
+        ui->statusbar->showMessage("File with this name already exists");
     }
+    ui->createFile->clear();
+    ui->dirCreateLine->clear();
 }
 
-void MainWindow::OnDeleteGroup(const QString& message) {
+void MainWindow::OnOperationWithGroup(const QString& message) {
+    qDebug() << message;
     if (message == "Success") {
         _commandHandler->SendCommand(Operation::GetGroupsList, {_username, _token});
     } else if (message == "No access") {
         ui->statusbar->showMessage("Have not enough rights");
-    }
-}
-
-void MainWindow::OnCreateGroup(const QString& message) {
-    if (message == "Success") {
-        _commandHandler->SendCommand(Operation::GetGroupsList, {_username, _token});
-    } else if (message == "Already Exists") {
-        ui->statusbar->showMessage("Group alredy exists");
-    }
-}
-
-void MainWindow::OnAddUserToGroup(const QString& message) {
-    if (message == "Success") {
-        _commandHandler->SendCommand(Operation::GetGroupsList, {_username, _token});
     } else if (message == "User Not Found") {
         ui->statusbar->showMessage("User with this login isn't exist");
+    } else if (message == "Already Exists") {
+        ui->statusbar->showMessage("Group alredy exists");
     }
 }
 
@@ -136,14 +132,6 @@ void MainWindow::OnUpdateFileList(const QString& message) {
         return ;
     }
     _treeHandler->LoadJsonToTreeView(ui->listTree, jsonDocument);
-}
-
-void MainWindow::OnFileDeleted(const QString& message) {
-    if (message == "Denied") {
-        QMessageBox::warning(this, "Delete", "Permission denied");
-    } else if (message == "Success") {
-        _commandHandler->SendCommand(Operation::GetFileList, {_username, _token});
-    }
 }
 
 void MainWindow::OnGetUsersList(const QString& response) {
@@ -281,46 +269,135 @@ void JsonTreeHandler::PopulateTree(QStandardItem* parentItem, const QJsonObject&
 
 void MainWindow::ShowContextMenu(const QPoint& pos) {
     QModelIndex index = ui->listTree->indexAt(pos);
-    if (!index.isValid()) {
+    if (!index.isValid() || index.column() != 0) {
         return;
     }
+
+    int column = 1;
+    QModelIndex columnIndex = index.sibling(index.row(), column);
+
+    if (!columnIndex.isValid()) {
+        return;
+    }
+
+    QVariant data = columnIndex.data();
+    qDebug() << "Data from column:" << data.toString();
+
     std::unordered_map<std::string, QAction *> actions;
     actions.emplace("Update", new QAction(tr("Обновить"), this));
     actions.emplace("Delete", new QAction(tr("Удалить"), this));
+    actions.emplace("Add", new QAction(tr("Добавить в группу"), this));
+    actions.emplace("Change_rights", new QAction(tr("Изменить права"), this));
     QMenu* menu = new QMenu(this);
-    if (index.column() == 0) {
-        actions.emplace("Add", new QAction(tr("Добавить в группу"), this));
 
-        connect(actions["Add"], &QAction::triggered, this, [this, index]() {
-            std::string fileName = index.data().toString().toStdString();
-            QDialog dialog(this);
-            dialog.setWindowTitle("Добавление в группу");
-            QVBoxLayout* layout = new QVBoxLayout(&dialog);
-            QLabel* label = new QLabel("Введите имя группы", &dialog);
-            layout->addWidget(label);
-            QLineEdit* lineEdit = new QLineEdit(&dialog);
-            layout->addWidget(lineEdit);
-            QPushButton* submitButton = new QPushButton("Подтвердить", &dialog);
-            layout->addWidget(submitButton);
+    connect(actions["Add"], &QAction::triggered, this, [this, index]() {
+        std::string fileName = index.data().toString().toStdString();
+        QDialog dialog(this);
+        dialog.setWindowTitle("Добавление в группу");
+        QVBoxLayout* layout = new QVBoxLayout(&dialog);
+        QLabel* label = new QLabel("Введите имя группы", &dialog);
+        layout->addWidget(label);
+        QLineEdit* lineEdit = new QLineEdit(&dialog);
+        layout->addWidget(lineEdit);
+        QPushButton* submitButton = new QPushButton("Подтвердить", &dialog);
+        layout->addWidget(submitButton);
 
-            connect(submitButton, &QPushButton::clicked, &dialog, [&dialog, lineEdit, fileName, this]() {
-                QString enteredGroup = lineEdit->text();
-                if (!enteredGroup.isEmpty()) {
-                    _commandHandler->SendCommand(Operation::AddFileToGroup, {_username, _token, fileName, enteredGroup.toStdString()});
-                }
-                dialog.accept();
-            });
-
-            dialog.setLayout(layout);
-            dialog.exec();
+        connect(submitButton, &QPushButton::clicked, &dialog, [&dialog, lineEdit, fileName, this]() {
+            QString enteredGroup = lineEdit->text();
+            if (!enteredGroup.isEmpty()) {
+                _commandHandler->SendCommand(Operation::AddFileToGroup, {_username, _token, fileName, enteredGroup.toStdString()});
+            }
+            dialog.accept();
         });
-        menu->addAction(actions["Add"]);
-        connect(actions["Update"], SIGNAL(triggered()), this, SLOT(NeedUpdateFileList()));
-        connect(actions["Delete"], &QAction::triggered, [this, index]() { DeleteFile(index.data(Qt::DisplayRole).toString()); });
-        menu->addAction(actions["Update"]);
-        menu->addAction(actions["Delete"]);
-        menu->popup(ui->listTree->viewport()->mapToGlobal(pos));
-    }
+
+        dialog.setLayout(layout);
+        dialog.exec();
+    });
+
+    connect(actions["Change_rights"], &QAction::triggered, this, [this, index]() {
+        std::string fileName = index.data().toString().toStdString();
+        QDialog dialog(this);
+        dialog.setWindowTitle("Изменение прав");
+        QVBoxLayout* verticalLayout = new QVBoxLayout(&dialog);
+
+        QGridLayout *layout = new QGridLayout(this);
+        QLabel *headerUser = new QLabel("Права пользователя");
+        QLabel *headerGroup = new QLabel("Права группы");
+        QLabel *headerAll = new QLabel("Права всех");
+
+        layout->addWidget(new QLabel(""), 0, 0);
+        layout->addWidget(headerUser, 1, 0);
+        layout->addWidget(headerGroup, 2, 0);
+        layout->addWidget(headerAll, 3, 0);
+
+        QLabel *readLabel = new QLabel("Чтение");
+        QLabel *writeLabel = new QLabel("Запись");
+        QLabel *execLabel = new QLabel("Выполнение");
+
+        layout->addWidget(readLabel, 0, 1);
+        layout->addWidget(writeLabel, 0, 2);
+        layout->addWidget(execLabel, 0, 3);
+
+        // Чекбоксы
+        QCheckBox *userRead = new QCheckBox();
+        QCheckBox *groupRead = new QCheckBox();
+        QCheckBox *allRead = new QCheckBox();
+
+        QCheckBox *userWrite = new QCheckBox();
+        QCheckBox *groupWrite = new QCheckBox();
+        QCheckBox *allWrite = new QCheckBox();
+
+        QCheckBox *userExec = new QCheckBox();
+        QCheckBox *groupExec = new QCheckBox();
+        QCheckBox *allExec = new QCheckBox();
+
+        layout->addWidget(userRead, 1, 1);
+        layout->addWidget(groupRead, 1, 2);
+        layout->addWidget(allRead, 1, 3);
+
+        layout->addWidget(userWrite, 2, 1);
+        layout->addWidget(groupWrite, 2, 2);
+        layout->addWidget(allWrite, 2, 3);
+
+        layout->addWidget(userExec, 3, 1);
+        layout->addWidget(groupExec, 3, 2);
+        layout->addWidget(allExec, 3, 3);
+
+        QPushButton* submitButton = new QPushButton("Подтвердить", &dialog);
+        verticalLayout->addLayout(layout);
+        verticalLayout->addWidget(submitButton);
+
+        connect(submitButton, &QPushButton::clicked, &dialog, [&dialog, layout, fileName, this]() {
+            QString permissions = "";
+            for (int row = 1; row <= 3; ++row) {
+                for (int col = 1; col <= 3; ++col) {
+                    QCheckBox* checkBox = qobject_cast<QCheckBox*>(layout->itemAtPosition(row, col)->widget());
+                    if (checkBox) {
+                        if (checkBox->isChecked()) {
+                            if (col == 1) permissions += "r";
+                            else if (col == 2) permissions += "w";
+                            else if (col == 3) permissions += "x";
+                        } else {
+                            permissions += "-";
+                        }
+                    }
+                }
+            }
+            _commandHandler->SendCommand(Operation::ChangeRights, {_username, _token, fileName, permissions.toStdString()});
+            dialog.accept();
+        });
+
+        dialog.setLayout(layout);
+        dialog.exec();
+    });
+
+    connect(actions["Update"], SIGNAL(triggered()), this, SLOT(NeedUpdateFileList()));
+    connect(actions["Delete"], &QAction::triggered, [this, index]() { DeleteFile(index.data(Qt::DisplayRole).toString()); });
+    menu->addAction(actions["Add"]);
+    menu->addAction(actions["Update"]);
+    menu->addAction(actions["Delete"]);
+    menu->addAction(actions["Change_rights"]);
+    menu->popup(ui->listTree->viewport()->mapToGlobal(pos));
 }
 
 void MainWindow::ShowContextMenuGroups(const QPoint& pos) {

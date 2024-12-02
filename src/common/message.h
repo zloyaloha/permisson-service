@@ -24,7 +24,8 @@ enum Operation {
     AddUserToGroup,
     DeleteGroup,
     CreateGroup,
-    AddFileToGroup
+    AddFileToGroup,
+    ChangeRights
 };
 
 class BaseCommand {

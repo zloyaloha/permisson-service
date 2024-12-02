@@ -13,10 +13,10 @@ BEGIN
     -- Находим user_id по login
     SELECT user_id INTO v_user_id
     FROM permission_app.users
-    WHERE login = p_login AND root = TRUE;
+    WHERE login = p_login;
     
     IF v_user_id IS NULL THEN
-        RETURN 'No access';
+        RETURN 'User Not Found';
     END IF;
 
     SELECT group_id INTO v_group_id

@@ -74,7 +74,53 @@ pqxx::result Worker::MakeQuery(const std::string& query) {
 Worker::Worker(ThreadPool& threadPool, std::shared_ptr<tcp::socket> socket, std::vector<std::shared_ptr<IServerObserver>>& observers) 
     : _threadPool(threadPool), _socket(socket), Observable(observers), _connection(std::make_unique<pqxx::connection>(PARAM_STRING)) {
         StopActiveSession();
+        PrepareQueries();
     }
+
+void Worker::PrepareQueries() {
+    _connection->prepare("add_file_to_group",
+        "SELECT permission_app.AddFileToGroup($1, $2, $3)");
+    _connection->prepare("is_user_owner_or_root",
+        "SELECT permission_app.IsUserOwnerOrRoot($1, $2)");
+    _connection->prepare("is_root",
+        "SELECT permission_app.IsRoot($1)");
+    _connection->prepare("add_event",
+        "SELECT permission_app.AddEvent($1, $2, $3)");
+    _connection->prepare("update_user_permissions_by_mask",
+        "SELECT permission_app.UpdateUserPermissionsByMask($1, $2)");
+    _connection->prepare("update_group_permissions_by_mask",
+        "SELECT permission_app.UpdateGroupPermissionsByMask($1, $2)");
+    _connection->prepare("update_all_permissions_by_mask",
+        "SELECT permission_app.UpdateAllPermissionsByMask($1, $2)");
+    _connection->prepare("delete_group",
+        "SELECT permission_app.DeleteGroup($1, $2)");
+    _connection->prepare("create_group",
+        "SELECT permission_app.CreateGroup($1, $2)");
+    _connection->prepare("add_user_to_group",
+        "SELECT permission_app.AddUserToGroup($1, $2)");
+    _connection->prepare("get_group_list",
+        "SELECT * FROM permission_app.GetGroupList()");
+    _connection->prepare("get_users_list",
+        "SELECT * FROM permission_app.GetUsersWithStatus()");
+    _connection->prepare("get_files_list",
+        "SELECT * FROM permission_app.GetFileTreeWithPermissions()");
+    _connection->prepare("delete_file",
+        "SELECT permission_app.DeleteFileByNameAndUser($1, $2)");
+    _connection->prepare("create_file",
+        "SELECT permission_app.AddFileToPath($1, $2, $3)");
+    _connection->prepare("create_dir",
+        "SELECT permission_app.AddDirectoryToPath($1, $2, $3)");
+    _connection->prepare("quit",
+        "CALL permission_app.UpdateExitTime($1)");
+    _connection->prepare("get_salt_and_password",
+        "SELECT permission_app.GetSaltAndPassword($1)");
+    _connection->prepare("create_session",
+        "SELECT permission_app.AddSession($1)");
+    _connection->prepare("get_user_id",
+        "SELECT permission_app.UserId($1)");
+    _connection->prepare("create_user",
+        "CALL permission_app.CreateUser($1, $2, $3)");
+}
 
 void Worker::StopActiveSession() {
     try {
@@ -177,7 +223,11 @@ void Worker::ProccessOperation(const BaseCommand &command) {
                 NotifyObservers("Security warning");
                 break;
             }
-            result = DeleteFile(command._msg_data[0], command._msg_data[2]);
+            if (!IsRootOrOwner(command._msg_data[0], command._msg_data[2])) {
+                result = "No access";
+            } else {
+                result = DeleteFile(command._msg_data[0], command._msg_data[2]);
+            }
             SendResponse(command._op, {result});
             break;
         case Operation::GetFileList:
@@ -213,7 +263,11 @@ void Worker::ProccessOperation(const BaseCommand &command) {
                 NotifyObservers("Security warning");
                 break;
             }
-            result = AddUserToGroup(command._msg_data[2], command._msg_data[3]); // group, username
+            if (!IsRoot(command._msg_data[0])) {
+                result = "No access";
+            } else {
+                result = AddUserToGroup(command._msg_data[2], command._msg_data[3]); // group, username
+            }
             SendResponse(command._op, {result});
             break;
         case Operation::CreateGroup:
@@ -221,6 +275,9 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // acceptor username, token
                 NotifyObservers("Security warning");
                 break;
+            }
+            if (!IsRoot(command._msg_data[0])) {
+                result = "No access";
             }
             result = CreateGroup(command._msg_data[2], command._msg_data[0]); // group, username
             SendResponse(command._op, {result});
@@ -240,177 +297,297 @@ void Worker::ProccessOperation(const BaseCommand &command) {
                 NotifyObservers("Security warning");
                 break;
             }
-            result = AddFileToGroup(command._msg_data[2], command._msg_data[3], command._msg_data[0]); // username, file, group
+            result = AddFileToGroup(command._msg_data[2], command._msg_data[3], command._msg_data[0]); // file, group, username
+            SendResponse(command._op, {result});
+            break;
+        case Operation::ChangeRights:
+            NotifyObservers("ChangeRights " + command._msg_data[2] + ' ' + command._msg_data[3]); // file, permissions
+            if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
+                NotifyObservers("Security warning");
+                break;
+            }
+            if (!IsRootOrOwner(command._msg_data[0], command._msg_data[2])) {
+                result = "No access";
+            } else {
+                result = ChangeRights(command._msg_data[2], command._msg_data[3], command._msg_data[0]); // file, permissions, username
+            }
             SendResponse(command._op, {result});
             break;
     }
+}
+
+bool Worker::IsRoot(const std::string& userName) {
+    pqxx::work work(*_connection);
+    try {
+        pqxx::result result = work.exec_prepared("is_root", userName);
+        if (!result.empty() && result[0][0].is_null() == false) {
+            return result[0][0].as<bool>();
+        }
+    } catch (const std::exception& e) {
+        NotifyObservers("Error: " + std::string(e.what()));
+        return false;
+    }
+    return false;
+}
+
+bool Worker::IsRootOrOwner(const std::string& userName, const std::string& fileName) {
+    pqxx::work work(*_connection);
+    try {
+        pqxx::result result = work.exec_prepared("is_user_owner_or_root", userName, fileName);
+        if (!result.empty() && result[0][0].is_null() == false) {
+            return result[0][0].as<bool>();
+        }
+    } catch (const std::exception& e) {
+        NotifyObservers("Error: " + std::string(e.what()));
+        return false;
+    }
+    return false;
+}
+
+int Worker::SetMask(int start, const std::string& permissions) {
+    int mask = 0;
+    for (int i = start; i < start + 3; ++i) {
+        if (permissions[i] != '-') {
+            mask |= (1 << (i % 3));
+        }
+    }
+    return mask;
+}
+
+std::string Worker::ChangeRights(const std::string& fileName, const std::string& permissions, const std::string& userName) {
+    int mask = SetMask(0, permissions);
+    std::string userResult = SetUserRights(fileName, mask);
+    mask = SetMask(3, permissions);
+    std::string groupResult = SetGroupRights(fileName, mask);
+    mask = SetMask(6, permissions);
+    std::string allResult = SetAllRights(fileName, mask);
+    pqxx::work work(*_connection);
+    try {
+        pqxx::result result = work.exec_prepared("add_event", fileName, userName, permissions);
+    } catch (const std::exception& e) {
+        NotifyObservers("Error: " + std::string(e.what()));
+        return "Error";
+    }
+    work.commit();
+    if (userResult + groupResult + allResult == "ttt") {
+        return "Success";
+    } else {
+        return "Wrong";
+    }
+}
+
+std::string Worker::SetUserRights(const std::string& fileName, int mask) {
+    std::string output;
+    pqxx::work work(*_connection);
+    try {
+        pqxx::result result = work.exec_prepared("update_user_permissions_by_mask", fileName, mask);
+        output = GetStringQueryResult(result);
+    } catch (const std::exception& e) {
+        NotifyObservers("Error: " + std::string(e.what()));
+        return "Error";
+    }
+    work.commit();
+    return output;
+}
+
+
+std::string Worker::SetGroupRights(const std::string& fileName, int mask) {
+    std::string output;
+    pqxx::work work(*_connection);
+    try {
+        pqxx::result result = work.exec_prepared("update_group_permissions_by_mask", fileName, mask);
+        output = GetStringQueryResult(result);
+    } catch (const std::exception& e) {
+        NotifyObservers("Error: " + std::string(e.what()));
+        return "Error";
+    }
+    work.commit();
+    return output;
+}
+
+std::string Worker::SetAllRights(const std::string& fileName, int mask) {
+    std::string output;
+    pqxx::work work(*_connection);
+    try {
+        pqxx::result result = work.exec_prepared("update_all_permissions_by_mask", fileName, mask);
+        output = GetStringQueryResult(result);
+    } catch (const std::exception& e) {
+        NotifyObservers("Error: " + std::string(e.what()));
+        return "Error";
+    }
+    work.commit();
+    return output;
 }
 
 std::string Worker::AddFileToGroup(const std::string& fileName, const std::string& groupName, const std::string& userName) {
     std::string output;
     pqxx::work work(*_connection);
     try {
-        pqxx::result result = work.exec("SELECT permission_app.AddFileToGroup(" + work.quote(fileName) + ", " + work.quote(groupName) + ", " + work.quote(userName) + ");");
+        pqxx::result result = work.exec_prepared("add_file_to_group", fileName, groupName, userName);
         output = GetStringQueryResult(result);
-    } catch (std::string error) {
-        NotifyObservers("Error: " + error);
+    } catch (const std::exception& e) {
+        NotifyObservers("Error: " + std::string(e.what()));
         return "Error";
     }
     work.commit();
     return output;
 }
+
 
 std::string Worker::DeleteGroup(const std::string& groupName, const std::string& userName) {
     std::string output;
     pqxx::work work(*_connection);
     try {
-        pqxx::result result = work.exec("SELECT permission_app.DeleteGroup(" + work.quote(groupName) + ", " + work.quote(userName) + ");");
+        pqxx::result result = work.exec_prepared("delete_group", groupName, userName);
         output = GetStringQueryResult(result);
-    } catch (std::string error) {
-        NotifyObservers("Error: " + error);
+    } catch (const std::exception& e) {
+        NotifyObservers("Error: " + std::string(e.what()));
         return "Error";
     }
     work.commit();
     return output;
 }
+
 
 std::string Worker::CreateGroup(const std::string& groupName, const std::string& userName) {
     std::string output;
     pqxx::work work(*_connection);
     try {
-        pqxx::result result = work.exec("SELECT permission_app.CreateGroup(" + work.quote(groupName) + ", " + work.quote(userName) + ");");
+        pqxx::result result = work.exec_prepared("create_group", groupName, userName);
         output = GetStringQueryResult(result);
-    } catch (std::string error) {
-        NotifyObservers("Error: " + error);
+    } catch (const std::exception& e) {
+        NotifyObservers("Error: " + std::string(e.what()));
         return "Error";
     }
     work.commit();
     return output;
 }
+
 
 std::string Worker::AddUserToGroup(const std::string& groupName, const std::string& userName) {
     std::string output;
     pqxx::work work(*_connection);
     try {
-        pqxx::result result = work.exec("SELECT permission_app.AddUserToGroup(" + work.quote(groupName) + ", " + work.quote(userName) + ");");
+        pqxx::result result = work.exec_prepared("add_user_to_group", groupName, userName);
         output = GetStringQueryResult(result);
-    } catch (std::string error) {
-        NotifyObservers("Error: " + error);
+    } catch (const std::exception& e) {
+        NotifyObservers("Error: " + std::string(e.what()));
         return "Error";
     }
     work.commit();
     return output;
 }
+
 
 std::string Worker::GetGroupsList() {
     std::string output;
     pqxx::work work(*_connection);
     try {
-        pqxx::result result = work.exec("SELECT * FROM permission_app.GetGroupList();");
+        pqxx::result result = work.exec_prepared("get_group_list");
         QJsonObject groupsList = _jsonHandler.GenerateGroupsList(result);
         QJsonDocument doc(groupsList);
         output = doc.toJson(QJsonDocument::Compact).toStdString();
-    } catch (std::string error) {
-        NotifyObservers("Error: " + error);
+    } catch (const std::exception& e) {
+        NotifyObservers("Error: " + std::string(e.what()));
         return "Error";
     }
-    work.commit();
     return output;
 }
+
 
 std::string Worker::GetUsersList() {
     std::string output;
     pqxx::work work(*_connection);
     try {
-        pqxx::result result = work.exec("SELECT * FROM permission_app.GetUsersWithStatus();");
+        pqxx::result result = work.exec_prepared("get_users_list");
         QJsonObject usersList = _jsonHandler.GenerateUsersList(result);
         QJsonDocument doc(usersList);
         output = doc.toJson(QJsonDocument::Compact).toStdString();
-    } catch (std::string error) {
-        NotifyObservers("Error: " + error);
+    } catch (const std::exception& e) {
+        NotifyObservers("Error: " + std::string(e.what()));
         return "Error";
     }
-    work.commit();
     return output;
 }
+
 
 std::string Worker::DeleteFile(const std::string& username, const std::string& filename) {
     std::string output;
     pqxx::work work(*_connection);
     try {
-        pqxx::result result = work.exec("SELECT permission_app.DeleteFileByNameAndUser(" + work.quote(username) + ", " + work.quote(filename) + ");");
+        pqxx::result result = work.exec_prepared("delete_file", username, filename);
         output = GetStringQueryResult(result);
-    } catch (std::string error) {
-        NotifyObservers("Error: " + error);
+    } catch (const std::exception& e) {
+        NotifyObservers("Error: " + std::string(e.what()));
         return "Error";
     }
     work.commit();
     return output;
 }
 
+
 std::string Worker::GetFileList() {
+    std::string output;
+    pqxx::work work(*_connection);
     try {
-        pqxx::work work(*_connection);
-        pqxx::result result = work.exec("SELECT * FROM permission_app.GetFileTreeWithPermissions();");
-        work.commit();
-        QJsonObject jsonTree = _jsonHandler.GenerateFileTree(result);
-        QJsonDocument doc(jsonTree);
-        return doc.toJson(QJsonDocument::Compact).toStdString();
-    } catch (std::string error) {
-        NotifyObservers("Error: " + error);
+        pqxx::result result = work.exec_prepared("get_files_list");
+        QJsonObject filesList = _jsonHandler.GenerateFileTree(result);
+        QJsonDocument doc(filesList);
+        output = doc.toJson(QJsonDocument::Compact).toStdString();
+    } catch (const std::exception& e) {
+        NotifyObservers("Error: " + std::string(e.what()));
         return "Error";
     }
+    return output;
 }
+
 
 std::string Worker::CreateFile(const std::string& username, const std::string& path, const std::string& filename) {
+    std::string output;
+    pqxx::work work(*_connection);
     try {
-        pqxx::work work(*_connection);
-        pqxx::result result = work.exec("SELECT permission_app.AddFileToPath(" + work.quote(path) + ", " + work.quote(filename) + ", " + work.quote(username) + ");");
-        work.commit();
-        return GetStringQueryResult(result);
-    } catch (std::string error) {
-        NotifyObservers("Error: " + error);
+        pqxx::result result = work.exec_prepared("create_file", path, filename, username);
+        output = GetStringQueryResult(result);
+    } catch (const std::exception& e) {
+        NotifyObservers("Error: " + std::string(e.what()));
         return "Error";
     }
+    work.commit();
+    return output;
 }
+
 
 std::string Worker::CreateDir(const std::string& username, const std::string& path, const std::string& filename) {
+    std::string output;
+    pqxx::work work(*_connection);
     try {
-        pqxx::work work(*_connection);
-        pqxx::result result = work.exec("SELECT permission_app.AddDirectoryToPath(" + work.quote(path) + ", " + work.quote(filename) + ", " + work.quote(username) + ");");
-        work.commit();
-        return GetStringQueryResult(result);
-    } catch (std::string error) {
-        NotifyObservers("Error: " + error);
+        pqxx::result result = work.exec_prepared("create_dir", path, filename, username);
+        output = GetStringQueryResult(result);
+    } catch (const std::exception& e) {
+        NotifyObservers("Error: " + std::string(e.what()));
         return "Error";
     }
-}
-
-std::string Worker::GetRole(const std::string& role) {
-    try {
-        pqxx::work work(*_connection);
-        pqxx::result result = work.exec("SELECT permission_app.UserRights(" + work.quote(role) + ");");
-        work.commit();
-        std::string admin = GetStringQueryResult(result);
-        if (admin == "t") {
-            return "admin";
-        } else {
-            return "common";
-        }
-    } catch (std::string error) {
-        NotifyObservers("Error: " + error);
-        return "Error";
-    }
+    work.commit();
+    return output;
 }
 
 void Worker::Quit(const std::string& token) {
+    std::string output;
+    pqxx::work work(*_connection);
     try {
-        pqxx::work work(*_connection);
-        pqxx::result result = work.exec("CALL permission_app.UpdateExitTime(" + work.quote(token) + ");");
-        work.commit();
-    } catch (std::string error) {
-        NotifyObservers("Error: " + error);
+        pqxx::result result = work.exec_prepared("quit", token);
+    } catch (const std::exception& e) {
+        NotifyObservers("Error: " + std::string(e.what()));
         return;
+    }
+    work.commit();
+}
+
+std::string Worker::GetRole(const std::string& role) {
+    if (IsRoot(role)) {
+        return "admin";
+    } else {
+        return "common";
     }
 }
 
@@ -439,56 +616,55 @@ std::string Worker::Registrate(const std::string& login, const std::string& pass
 }
 
 std::pair<std::string, std::string> Worker::GetSaltAndPassword(const std::string& login) {
+    pqxx::work work(*_connection);
     try {
-        pqxx::work work(*_connection);
-        pqxx::result result = work.exec("SELECT permission_app.GetSaltAndPassword(" + work.quote(login) + ");");
-        work.commit();
+        pqxx::result result = work.exec_prepared("get_salt_and_password", login);
         return GetPairQueryResult(result);  
     } catch (std::string error) {
         NotifyObservers("Error: " + error);
         return std::make_pair("", "");
     }
+    return std::make_pair("", "");
+    work.commit();
 }
 
 std::string Worker::CreateSession(const int user_id) {
+    std::string output;
+    pqxx::work work(*_connection);
     try {
-        pqxx::work work(*_connection);
-        pqxx::result result = work.exec("SELECT permission_app.AddSession(" + work.quote(user_id) + ");");
-        std::string response = GetStringQueryResult(result);
-        work.commit();
-        return response;
-    } catch (std::string error) {
-        NotifyObservers("Error: " + error);
-        return "";
+        pqxx::result result = work.exec_prepared("create_session", user_id);
+        output = GetStringQueryResult(result);
+    } catch (const std::exception& e) {
+        NotifyObservers("Error: " + std::string(e.what()));
+        return "Error";
     }
+    work.commit();
+    return output;
 }
 
-
 int Worker::UserID(const std::string& login) {
+    std::string output;
+    pqxx::work work(*_connection);
     try {
-        pqxx::work work(*_connection);
-        pqxx::result result = work.exec("SELECT permission_app.UserID(" + work.quote(login) + ");");
-        std::string response = GetStringQueryResult(result);
-        work.commit();
-        return std::stoi(response);
-    } catch (std::string error) {
-        NotifyObservers("Error: " + error);
-        return 0;
+        pqxx::result result = work.exec_prepared("get_user_id", login);
+        output = GetStringQueryResult(result);
+    } catch (const std::exception& e) {
+        NotifyObservers("Error: " + std::string(e.what()));
+        return -1;
     }
+    work.commit();
+    return std::stoi(output);
 }
 
 void Worker::CreateUser(const std::string &username, const std::string& hashed_password, const std::string& salt) {
+    pqxx::work work(*_connection);
     try {
-        pqxx::work work(*_connection);
-        pqxx::result result = work.exec("CALL permission_app.CreateUser(" 
-                                            + work.quote(username) + ", "
-                                            + work.quote(hashed_password) + ", "
-                                            + work.quote(salt) + ");");
-        work.commit();
-    } catch (std::string error) {
-        NotifyObservers("Error: " + error);
+        pqxx::result result = work.exec_prepared("create_user", username, hashed_password, salt);
+    } catch (const std::exception& e) {
+        NotifyObservers("Error: " + std::string(e.what()));
         return;
     }
+    work.commit();
 }
 
 std::string Worker::GenerateSalt(std::size_t size) const {

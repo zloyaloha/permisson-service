@@ -58,10 +58,10 @@ BEGIN
         RETURN 'File Already Added';
     END IF;
 
-    INSERT INTO permission_app.permissions_group (node_id, group_id)
-    VALUES (file_id_selected, group_id_selected);
+    UPDATE permission_app.permissions_group
+    SET group_id = group_id_selected
+    WHERE node_id = file_id_selected;
 
-    -- Добавляем событие в таблицу user_events
     INSERT INTO permission_app.user_events (user_id, event, description)
     VALUES (user_id_selected, 'ADD_FILE_TO_GROUP', 'File "' || file_name || '" added to group "' || group_name || '"');
 

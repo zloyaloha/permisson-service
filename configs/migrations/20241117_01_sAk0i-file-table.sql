@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS permission_app.events (
     user_id INT REFERENCES permission_app.users(user_id) ON DELETE CASCADE,
     file_id INT REFERENCES permission_app.nodes(file_id) ON DELETE CASCADE,
     event event_type,
+    description VARCHAR(50) DEFAULT '',
     event_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

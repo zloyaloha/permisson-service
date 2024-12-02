@@ -52,7 +52,7 @@ BEGIN
     -- Проверяем, существует ли директория с таким именем в указанной директории
     SELECT file_id INTO current_id
     FROM permission_app.nodes
-    WHERE name = dir_name AND parent_id = parent_id_find AND type = 'DIR';
+    WHERE name = dir_name AND parent_id = parent_id_find;
 
     IF current_id IS NULL THEN
         -- Вставляем новую директорию
@@ -74,10 +74,10 @@ BEGIN
         INSERT INTO permission_app.events (user_id, file_id, event)
         VALUES (username_user_id, new_dir_id, 'CREATE_DIR');
     ELSE
-        RETURN 'Directory exists';
+        RETURN 'File exists';
     END IF;
 
-    RETURN 'Directory created: ' || dir_name;
+    RETURN 'Success';
 END;
 $$;
 

@@ -103,8 +103,14 @@ class Worker : public std::enable_shared_from_this<Worker>, public Observable {
         std::string CreateGroup(const std::string& groupName, const std::string& userName);
         std::string DeleteGroup(const std::string& groupName, const std::string& userName);
         std::string AddFileToGroup(const std::string& fileName, const std::string& groupName, const std::string& userName);
+        std::string ChangeRights(const std::string& fileName, const std::string& permissions, const std::string& userName);
+        bool IsRootOrOwner(const std::string& userName, const std::string& fileName);
+        bool IsRoot(const std::string& userName);
         void Quit(const std::string& token);
     private:
+        std::string SetUserRights(const std::string& fileName, int mask);
+        std::string SetGroupRights(const std::string& fileName, int mask);
+        std::string SetAllRights(const std::string& fileName, int mask);
         bool ValidateRequest(const std::string& username, const std::string& token);
         std::string GetToken(const std::string& username);
         void StopActiveSession();
@@ -116,9 +122,11 @@ class Worker : public std::enable_shared_from_this<Worker>, public Observable {
         std::pair<std::string, std::string> GetSaltAndPassword(const std::string& login);
         void CreateUser(const std::string& login, const std::string& hashed_password, const std::string& salt);
         int UserID(const std::string& login);
+        int SetMask(int start, const std::string& permissions);
         std::string GetStringQueryResult(const pqxx::result& result) const;
         std::pair<std::string, std::string> GetPairQueryResult(const pqxx::result& result) const;
         pqxx::result MakeQuery(const std::string& query);
+        void PrepareQueries();
     private:
         JsonHandler _jsonHandler;
         ThreadPool& _threadPool;

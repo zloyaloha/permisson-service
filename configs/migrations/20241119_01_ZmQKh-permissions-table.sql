@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS permission_app.permissions_user (
     can_read BOOLEAN DEFAULT TRUE,
     can_write BOOLEAN DEFAULT TRUE,
     can_execute BOOLEAN DEFAULT TRUE,
-    UNIQUE(node_id, user_id)
+    UNIQUE(node_id)
 );
 
 -- Таблица для прав доступа групп
@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS permission_app.permissions_group (
     can_read BOOLEAN DEFAULT TRUE,
     can_write BOOLEAN DEFAULT FALSE,
     can_execute BOOLEAN DEFAULT TRUE,
-    UNIQUE(node_id, group_id)
+    UNIQUE(node_id)
 );
 
 CREATE TABLE IF NOT EXISTS permission_app.permissions_all (

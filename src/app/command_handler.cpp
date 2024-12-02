@@ -75,9 +75,6 @@ void CommandHandler::HandleMessage(const BaseCommand& command) {
         case Operation::GetFileList:
             emit UpdateFileList(QString::fromStdString(command._msg_data[0])); // json
             break;
-        case Operation::DeleteFile:
-            emit FileDeleted(QString::fromStdString(command._msg_data[0]));
-            break;
         case Operation::GetUsersList:
             emit GetUsersList(QString::fromStdString(command._msg_data[0]));
             break;
@@ -85,17 +82,16 @@ void CommandHandler::HandleMessage(const BaseCommand& command) {
             emit GetGroupsList(QString::fromStdString(command._msg_data[0]));
             break;
         case Operation::AddUserToGroup:
-            emit AddUserToGroup(QString::fromStdString(command._msg_data[0]));
-            break;
         case Operation::CreateGroup:
-            emit CreateGroup(QString::fromStdString(command._msg_data[0]));
-            break;
         case Operation::DeleteGroup:
-            emit DeleteGroup(QString::fromStdString(command._msg_data[0]));
+            emit OperationWithGroup(QString::fromStdString(command._msg_data[0]));
             break;
         case Operation::CreateFile:
+        case Operation::AddFileToGroup:
         case Operation::CreateDir:
-            emit CreateFile(QString::fromStdString(command._msg_data[0]));
+        case Operation::ChangeRights:
+        case Operation::DeleteFile:
+            emit OperationWithFile(QString::fromStdString(command._msg_data[0]));
             break;
         default:
             break;

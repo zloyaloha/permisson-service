@@ -15,6 +15,7 @@
 #include <QStandardItemModel>
 #include <QTreeView>
 #include <QMessageBox>
+#include <QCheckBox>
 #include <QFile>
 
 class JsonTreeHandler {
@@ -62,13 +63,10 @@ class MainWindow : public QMainWindow {
     private slots:
         void OnRoleMessageReceived(const QString& role);
         void OnUpdateFileList(const QString& role);
-        void OnFileDeleted(const QString& response);
         void OnGetUsersList(const QString& response);
         void OnGetGroupsList(const QString& response);
-        void OnAddUserToGroup(const QString& response);
-        void OnCreateGroup(const QString& response);
-        void OnDeleteGroup(const QString& response);
-        void OnCreateFile(const QString& response);
+        void OnOperationWithFile(const QString& response);
+        void OnOperationWithGroup(const QString& response);
         void DeleteFile(const QString& filename);
         void NeedUpdateFileList();
     public slots:

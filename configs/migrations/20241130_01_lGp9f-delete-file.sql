@@ -17,7 +17,7 @@ DECLARE
     belongs_to_group BOOLEAN;  -- Флаг, принадлежит ли пользователь группе-владельцу
 BEGIN
     -- Получаем ID пользователя и его root-права
-    SELECT user_id, root INTO requester_id, is_root
+    SELECT user_id INTO requester_id
     FROM permission_app.users
     WHERE login = username;
 
@@ -26,24 +26,12 @@ BEGIN
     END IF;
 
     -- Получаем ID директории и её владельца и группу
-    SELECT n.file_id, n.owner_id, n.group_id INTO directory_id, owner_id, owner_group_id
+    SELECT n.file_id INTO directory_id
     FROM permission_app.nodes n
     WHERE n.name = directory_name;
 
     IF directory_id IS NULL THEN
         RETURN 'Directory not found';
-    END IF;
-
-    -- Проверяем, принадлежит ли пользователь группе-владельцу
-    SELECT EXISTS(
-        SELECT 1
-        FROM permission_app.user_to_group
-        WHERE user_id = requester_id AND group_id = owner_group_id
-    ) INTO belongs_to_group;
-
-    -- Проверка прав пользователя
-    IF NOT (requester_id = owner_id OR is_root OR belongs_to_group) THEN
-        RETURN 'Access denied';
     END IF;
 
     -- Логируем событие удаления перед удалением данных
@@ -65,7 +53,7 @@ BEGIN
         SELECT file_id FROM nodes_to_delete
     );
 
-    RETURN 'Directory and contents successfully deleted';
+    RETURN 'Success';
 END;
 $$;
 
