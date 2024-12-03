@@ -38,6 +38,6 @@ BEGIN
     -- Возвращаем 'Success', если группа была успешно создана
     RETURN 'Success';
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 GRANT EXECUTE ON FUNCTION permission_app.CreateGroup(TEXT, TEXT) TO app_user;

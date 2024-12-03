@@ -22,7 +22,7 @@ BEGIN
     ORDER BY 
         g.name;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 
 GRANT EXECUTE ON FUNCTION permission_app.GetGroupList() TO app_user;

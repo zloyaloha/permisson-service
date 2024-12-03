@@ -3,6 +3,8 @@
 #include <vector>
 #include <boost/asio.hpp>
 #include <boost/beast.hpp>
+#include <boost/bind/bind.hpp>
+
 #include <string>
 #include <ctime>
 #include <chrono>
@@ -11,8 +13,6 @@
 #include <openssl/sha.h>
 #include <openssl/rand.h>
 #include <tuple>
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/json_parser.hpp>
 #include <sstream>
 #include <boost/foreach.hpp>
 #include <QJsonObject>
@@ -28,24 +28,22 @@
 using tcp = boost::asio::ip::tcp;
 namespace beast = boost::beast;
 namespace http = beast::http;
+using namespace boost::placeholders;
 
 class IServerObserver;
 
 namespace {
-    const int PORT = 12345;
     const int NUMBER_OF_THREADS = 4;
-    const std::string DB_HOST = "localhost";
-    const std::string DB_PORT = "5432";
-    const std::string DB_NAME = "permission-db";
-    const std::string DB_USER = "app_user";
-    const std::string DB_PASSWORD = "sup1234";
-    const std::string PARAM_STRING = 
-        "host=" + DB_HOST + 
-        " port=" + DB_PORT + 
-        " dbname=" + DB_NAME + 
-        " user=" + DB_USER + 
-        " password=" + DB_PASSWORD; 
 }
+
+struct Config {
+    int PORT;
+    QString DB_HOST;
+    QString DB_PORT;
+    QString DB_NAME;
+    QString DB_USER;
+    QString DB_PASSWORD;
+};
 
 struct FileInfo {
     QString path;
@@ -78,16 +76,17 @@ protected:
 
 class Server : public std::enable_shared_from_this<Server>, public Observable {
 public:
-    Server(boost::asio::io_context& io_context);
+    Server(boost::asio::io_context& io_context, const Config& conf);
     void AcceptConnections();
 private:
     tcp::acceptor _acceptor;
     ThreadPool _threadPool;
+    Config _config;
 };
 
 class Worker : public std::enable_shared_from_this<Worker>, public Observable {
     public:
-        Worker(ThreadPool& threadPool, std::shared_ptr<tcp::socket> socket, std::vector<std::shared_ptr<IServerObserver>>& observer);
+        Worker(ThreadPool& threadPool, std::shared_ptr<tcp::socket> socket, std::vector<std::shared_ptr<IServerObserver>>& observers, const Config& conf);
         ~Worker();
         void SendResponse(const Operation op, const std::initializer_list<std::string>& data);
         void ProccessOperation(const BaseCommand &command);
@@ -109,6 +108,9 @@ class Worker : public std::enable_shared_from_this<Worker>, public Observable {
         bool CheckUserRightsToWrite(const std::string& userName, const std::string& fileName);
         bool CheckUserRightsToRead(const std::string& userName, const std::string& fileName);
         bool CheckUserRightsToExec(const std::string& userName, const std::string& fileName);
+        void AddWriteEvent(const std::string& userName, const std::string& fileName);
+        void AddReadEvent(const std::string& userName, const std::string& fileName);
+        void AddExecEvent(const std::string& userName, const std::string& fileName);
         void Quit(const std::string& token);
     private:
         std::string SetUserRights(const std::string& fileName, int mask);
@@ -139,7 +141,7 @@ class Worker : public std::enable_shared_from_this<Worker>, public Observable {
 
 class Session : public std::enable_shared_from_this<Session>, public Observable {
 public:
-    explicit Session(std::shared_ptr<tcp::socket> socket, std::vector<std::shared_ptr<IServerObserver>>& observers, ThreadPool& threadPool);
+    explicit Session(std::shared_ptr<tcp::socket> socket, std::vector<std::shared_ptr<IServerObserver>>& observers, ThreadPool& threadPool, const Config& conf);
     void Start();
 private:
     void ReadMessage();

@@ -1,7 +1,7 @@
 -- File table
 -- depends: 20241108_04_CHDdk-off-session
 
-CREATE TYPE event_type AS ENUM ('READ', 'WRITE', 'DELETE', 'CHANGE_PERMISSION', 'CREATE_FILE', 'CREATE_DIR');
+CREATE TYPE event_type AS ENUM ('READ', 'WRITE', 'EXECUTE', 'DELETE', 'CHANGE_PERMISSION', 'CREATE_FILE', 'CREATE_DIR');
 CREATE TYPE file_type AS ENUM ('FILE', 'DIR');
 
 CREATE TABLE IF NOT EXISTS permission_app.nodes (

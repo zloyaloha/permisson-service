@@ -7,7 +7,7 @@ void Server::AcceptConnections() {
             if (!ec) {
                 NotifyObservers("Client connected!");
                 auto socketPtr = std::make_shared<tcp::socket>(std::move(socket)); 
-                std::make_shared<Session>(socketPtr, _observers, _threadPool)->Start();
+                std::make_shared<Session>(socketPtr, _observers, _threadPool, _config)->Start();
             } else {
                 NotifyObservers("ERROR while connecting" + ec.message());
             }
@@ -15,11 +15,11 @@ void Server::AcceptConnections() {
         });
 }
 
-Server::Server(boost::asio::io_context& io_context)
-    : _acceptor(io_context, tcp::endpoint(tcp::v4(), PORT)), _threadPool(NUMBER_OF_THREADS) {}
+Server::Server(boost::asio::io_context& io_context, const Config& conf)
+    : _acceptor(io_context, tcp::endpoint(tcp::v4(), conf.PORT)), _threadPool(NUMBER_OF_THREADS), _config(conf) {}
 
-Session::Session(std::shared_ptr<tcp::socket> socket, std::vector<std::shared_ptr<IServerObserver>>& observers, ThreadPool& threadPool) 
-    : _socket(std::move(socket)), _threadPool(threadPool), _worker(std::make_shared<Worker>(threadPool, _socket, _observers)), Observable(observers) {}
+Session::Session(std::shared_ptr<tcp::socket> socket, std::vector<std::shared_ptr<IServerObserver>>& observers, ThreadPool& threadPool, const Config& conf) 
+    : _socket(std::move(socket)), _threadPool(threadPool), _worker(std::make_shared<Worker>(threadPool, _socket, _observers, conf)), Observable(observers) {}
 
 void Session::Start() {
     ReadMessage();
@@ -67,11 +67,17 @@ pqxx::result Worker::MakeQuery(const std::string& query) {
     return result;
 }
 
-Worker::Worker(ThreadPool& threadPool, std::shared_ptr<tcp::socket> socket, std::vector<std::shared_ptr<IServerObserver>>& observers) 
-    : _threadPool(threadPool), _socket(socket), Observable(observers), _connection(std::make_unique<pqxx::connection>(PARAM_STRING)) {
-        StopActiveSession();
-        PrepareQueries();
-    }
+Worker::Worker(ThreadPool& threadPool, std::shared_ptr<tcp::socket> socket, std::vector<std::shared_ptr<IServerObserver>>& observers, const Config& conf) 
+    : _threadPool(threadPool), _socket(socket), Observable(observers) 
+{
+    QString PARAM_STRING = "host=" + conf.DB_HOST + 
+        " port=" + conf.DB_PORT + 
+        " dbname=" + conf.DB_NAME + 
+        " user=" + conf.DB_USER + 
+        " password=" + conf.DB_PASSWORD;
+    _connection = std::make_unique<pqxx::connection>(PARAM_STRING.toStdString());
+    PrepareQueries();
+}
 
 void Worker::PrepareQueries() {
     _connection->prepare("add_file_to_group",
@@ -122,6 +128,12 @@ void Worker::PrepareQueries() {
         "SELECT permission_app.UserId($1)");
     _connection->prepare("create_user",
         "CALL permission_app.CreateUser($1, $2, $3)");
+    _connection->prepare("add_read_event",
+        "CALL permission_app.AddReadEvent($1, $2)");
+    _connection->prepare("add_write_event",
+        "CALL permission_app.AddWriteEvent($1, $2)");
+    _connection->prepare("add_exec_event",
+        "CALL permission_app.AddExecEvent($1, $2)");
 }
 
 void Worker::StopActiveSession() {
@@ -328,6 +340,7 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             if (!CheckUserRightsToWrite(command._msg_data[0], command._msg_data[2]) && !IsRoot(command._msg_data[0])) { // username, file
                 result = "No access";
             } else {
+                AddWriteEvent(command._msg_data[0], command._msg_data[2]);
                 result = "Success";
             }
             SendResponse(command._op, {result});
@@ -341,6 +354,7 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             if (!CheckUserRightsToRead(command._msg_data[0], command._msg_data[2]) && !IsRoot(command._msg_data[0])) { // username, file
                 result = "No access";
             } else {
+                AddReadEvent(command._msg_data[0], command._msg_data[2]);
                 result = "Success";
             }
             SendResponse(command._op, {result});
@@ -354,11 +368,49 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             if (!CheckUserRightsToExec(command._msg_data[0], command._msg_data[2]) && !IsRoot(command._msg_data[0])) { // username, file
                 result = "No access";
             } else {
+                AddExecEvent(command._msg_data[0], command._msg_data[2]);
                 result = "Success";
             }
             SendResponse(command._op, {result});
             break;
     }
+    NotifyObservers("Result: " + result);
+}
+
+void Worker::AddWriteEvent(const std::string& userName, const std::string& fileName) {
+    pqxx::work work(*_connection);
+    try {
+        pqxx::result result = work.exec_prepared("add_write_event", userName, fileName);
+    } catch (const std::exception& e) {
+        NotifyObservers("Error: " + std::string(e.what()));
+        return;
+    }
+    work.commit();
+    return;
+}
+
+void Worker::AddReadEvent(const std::string& userName, const std::string& fileName) {
+    pqxx::work work(*_connection);
+    try {
+        pqxx::result result = work.exec_prepared("add_read_event", userName, fileName);
+    } catch (const std::exception& e) {
+        NotifyObservers("Error: " + std::string(e.what()));
+        return;
+    }
+    work.commit();
+    return;
+}
+
+void Worker::AddExecEvent(const std::string& userName, const std::string& fileName) {
+    pqxx::work work(*_connection);
+    try {
+        pqxx::result result = work.exec_prepared("add_exec_event", userName, fileName);
+    } catch (const std::exception& e) {
+        NotifyObservers("Error: " + std::string(e.what()));
+        return;
+    }
+    work.commit();
+    return;
 }
 
 bool Worker::CheckUserRightsToWrite(const std::string& userName, const std::string& fileName) {
@@ -711,8 +763,8 @@ std::pair<std::string, std::string> Worker::GetSaltAndPassword(const std::string
         NotifyObservers("Error: " + error);
         return std::make_pair("", "");
     }
-    return std::make_pair("", "");
     work.commit();
+    return std::make_pair("", "");
 }
 
 std::string Worker::CreateSession(const int user_id) {

@@ -21,7 +21,7 @@ BEGIN
         RETURN id;
     END IF;
 END;
-$$;
+$$ SECURITY DEFINER;
 
 GRANT EXECUTE ON FUNCTION permission_app.UserID(text) TO app_user;
 
@@ -35,7 +35,7 @@ BEGIN
     JOIN permission_app.groups g ON ug.group_id = g.group_id
     WHERE u.login = p_username;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 GRANT EXECUTE ON FUNCTION permission_app.GetUserGroups(TEXT) TO app_user;
 
@@ -50,7 +50,7 @@ BEGIN
         WHERE u.login = p_username AND g.name = p_groupname
     );
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 GRANT EXECUTE ON FUNCTION permission_app.IsUserInGroup(TEXT, TEXT) TO app_user;
 
@@ -75,6 +75,6 @@ BEGIN
         RETURN id;
     END IF;
 END;
-$$;
+$$ SECURITY DEFINER;
 
 GRANT EXECUTE ON FUNCTION permission_app.GroupID(text) TO app_user;

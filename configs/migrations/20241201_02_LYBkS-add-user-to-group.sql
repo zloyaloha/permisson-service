@@ -35,6 +35,6 @@ BEGIN
 
     RETURN 'Success';
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 GRANT EXECUTE ON FUNCTION permission_app.AddUserToGroup(TEXT, TEXT) TO app_user;

@@ -1,0 +1,11 @@
+{
+    "database":
+        {
+            "PORT": 12345,
+            "DB_HOST": "localhost",
+            "DB_PORT": "5432",
+            "DB_NAME": "permission-db",
+            "DB_USER": "app_user",
+            "DB_PASSWORD": "sup1234"
+        }
+}

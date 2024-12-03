@@ -29,6 +29,6 @@ BEGIN
     INSERT INTO permission_app.user_to_group(user_id, group_id)
     VALUES (s_user_id, s_group_id);
 END;
-$$;
+$$ SECURITY DEFINER;
 
 GRANT EXECUTE ON PROCEDURE permission_app.CreateUser(text, text, text) TO app_user;

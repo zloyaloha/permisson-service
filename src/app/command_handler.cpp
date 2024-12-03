@@ -20,15 +20,12 @@ void CommandHandler::Connect() {
 }
 
 void CommandHandler::ConnectToServer(tcp::resolver::results_type& endpoints) {
-    auto self = shared_from_this();  // Убедитесь, что shared_ptr доступен
-
-    // Ожидаем подключения к серверу
+    auto self = shared_from_this();
     boost::asio::async_connect(_socket, endpoints,
         [this, self, &endpoints](const boost::system::error_code& ec, const tcp::endpoint& endpoint) {
             if (!ec) {
                 std::cout << "Connected to " << endpoint << std::endl;
-                StartAsyncReading();  // Запускаем асинхронное чтение после успешного подключения
-                StopAsyncReading();
+                StartAsyncReading();
             } else {
                 std::cerr << "Error connecting: " << ec.message() << std::endl;
                 sleep(1);

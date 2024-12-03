@@ -61,6 +61,6 @@ BEGIN
     -- Возвращаем успешное сообщение
     RETURN 'Success';
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 GRANT EXECUTE ON FUNCTION permission_app.AddFileToGroup(VARCHAR, VARCHAR, VARCHAR) TO app_user;

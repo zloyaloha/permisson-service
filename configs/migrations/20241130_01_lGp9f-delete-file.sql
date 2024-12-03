@@ -18,7 +18,7 @@ DECLARE
 BEGIN
     -- Получаем ID пользователя и его root-права
     SELECT permission_app.UserID(username)
-    INTO owner_id;
+    INTO requester_id;
 
     IF requester_id IS NULL THEN
         RETURN 'User not found';
@@ -34,8 +34,6 @@ BEGIN
     END IF;
 
     -- Логируем событие удаления перед удалением данных
-    INSERT INTO permission_app.events (user_id, file_id, event)
-    VALUES (requester_id, directory_id, 'DELETE');
 
     -- Удаление директории и её содержимого рекурсивно
     DELETE FROM permission_app.nodes
@@ -52,6 +50,8 @@ BEGIN
         SELECT file_id FROM nodes_to_delete
     );
 
+    INSERT INTO permission_app.events (user_id, event)
+    VALUES (requester_id, 'DELETE');
     RETURN 'Success';
 END;
 $$;

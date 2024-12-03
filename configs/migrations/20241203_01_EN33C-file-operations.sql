@@ -183,7 +183,7 @@ BEGIN
     INTO fileName_file_id;
 
     -- Проверка прав "все" на запись
-    SELECT can_exec INTO can_all_exec
+    SELECT can_execute INTO can_all_exec
     FROM permission_app.permissions_all
     WHERE node_id = fileName_file_id;
 
@@ -192,7 +192,7 @@ BEGIN
     END IF;
 
     -- Проверка прав группы на запись
-    SELECT can_exec INTO can_group_exec
+    SELECT can_execute INTO can_group_exec
     FROM permission_app.permissions_group
     WHERE node_id = fileName_file_id;
 
@@ -207,7 +207,7 @@ BEGIN
     END IF;
 
     -- Проверка прав пользователя на запись
-    SELECT can_exec INTO can_user_exec
+    SELECT can_execute INTO can_user_exec
     FROM permission_app.permissions_user
     WHERE node_id = fileName_file_id;
 

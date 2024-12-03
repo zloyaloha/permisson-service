@@ -25,7 +25,7 @@ BEGIN
     FROM 
         permission_app.users u;
 END;
-$$;
+$$ SECURITY DEFINER;
 
 GRANT EXECUTE ON FUNCTION permission_app.GetUsersWithStatus() TO app_user;
 

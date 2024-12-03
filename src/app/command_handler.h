@@ -1,12 +1,13 @@
 #pragma once
 #include <boost/asio.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/asio/buffer.hpp>
 #include <QObject>
 #include "message.h"
 #include <string>
 #include "iostream"
 
+using namespace boost::placeholders;
 namespace {
     const std::string SERVER_ADDRESS = "127.0.0.1";
     const std::string PORT = "12345";

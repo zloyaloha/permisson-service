@@ -77,7 +77,6 @@ void HelloWindow::LoginButtonClicked()
         ui->statusbar->showMessage("Success login");
         _token = response._msg_data[0];
         _username = login.toStdString();
-        _commandHandler->StartAsyncReading();
         _mainWindow->SetupWindow(login, QString::fromStdString(_token));
     }
 }

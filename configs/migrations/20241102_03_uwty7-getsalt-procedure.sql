@@ -14,6 +14,6 @@ begin
     FROM permission_app.users
     WHERE login = username;
 end;
-$$;
+$$ SECURITY DEFINER;
 
 GRANT EXECUTE ON FUNCTION permission_app.GetSaltAndPassword(text) TO app_user;

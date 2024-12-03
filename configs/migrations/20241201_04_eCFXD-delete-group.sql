@@ -39,6 +39,6 @@ BEGIN
     -- Возвращаем 'Success', если группа была успешно удалена
     RETURN 'Success';
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 GRANT EXECUTE ON FUNCTION permission_app.DeleteGroup(VARCHAR, VARCHAR) TO app_user;
