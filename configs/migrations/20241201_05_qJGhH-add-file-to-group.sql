@@ -12,21 +12,14 @@ DECLARE
     user_id_selected INT;
     group_id_selected INT;
     file_id_selected INT;
-    is_admin BOOLEAN;
 BEGIN
     -- Получаем ID пользователя
-    SELECT user_id, root INTO user_id_selected, is_admin
-    FROM permission_app.users
-    WHERE login = username;
+    SELECT permission_app.UserID(username)
+    INTO user_id_selected;
 
     -- Если пользователь не найден
     IF user_id_selected IS NULL THEN
         RETURN 'User Not Found';
-    END IF;
-
-    -- Если пользователь не администратор
-    IF NOT is_admin THEN
-        RETURN 'Permission Denied';
     END IF;
 
     -- Получаем ID группы

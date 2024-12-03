@@ -25,7 +25,11 @@ enum Operation {
     DeleteGroup,
     CreateGroup,
     AddFileToGroup,
-    ChangeRights
+    ChangeRights,
+    WriteToFile,
+    ReadFromFile,
+    ExecFile,
+    QuitSession
 };
 
 class BaseCommand {
@@ -65,7 +69,6 @@ public:
             oss << _msg_data[i] << '\n';
         }
         oss << _msg_data[_msg_data.size() - 1] << TERMINATING_STRING;
-        std::cout << _msg_data[_msg_data.size() - 1] << std::endl;
         return oss.str();
     }
 

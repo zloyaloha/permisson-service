@@ -17,6 +17,8 @@
 #include <QMessageBox>
 #include <QCheckBox>
 #include <QFile>
+#include <QCloseEvent>
+#include <QWindow>
 
 class JsonTreeHandler {
 public:
@@ -83,4 +85,6 @@ class MainWindow : public QMainWindow {
         Ui::MainWindow *ui;
         std::string _username;
         std::string _token;
+    protected:
+        void closeEvent(QCloseEvent *event) override;
 };

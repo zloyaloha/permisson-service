@@ -17,9 +17,8 @@ DECLARE
     belongs_to_group BOOLEAN;  -- Флаг, принадлежит ли пользователь группе-владельцу
 BEGIN
     -- Получаем ID пользователя и его root-права
-    SELECT user_id INTO requester_id
-    FROM permission_app.users
-    WHERE login = username;
+    SELECT permission_app.UserID(username)
+    INTO owner_id;
 
     IF requester_id IS NULL THEN
         RETURN 'User not found';

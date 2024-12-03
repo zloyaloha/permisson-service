@@ -11,9 +11,8 @@ DECLARE
     v_group_id INT;
 BEGIN
     -- Находим user_id по login
-    SELECT user_id INTO v_user_id
-    FROM permission_app.users
-    WHERE login = p_login;
+    SELECT permission_app.UserID(p_login)
+    INTO v_user_id;
     
     IF v_user_id IS NULL THEN
         RETURN 'User Not Found';

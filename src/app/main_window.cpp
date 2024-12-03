@@ -9,6 +9,7 @@ MainWindow::MainWindow(std::shared_ptr<CommandHandler> commandor, QWidget *paren
     ui->listTree->setContextMenuPolicy(Qt::CustomContextMenu);
     ui->groupsTree->setContextMenuPolicy(Qt::CustomContextMenu);
 
+    this->installEventFilter(this);
     connect(_commandHandler.get(), &CommandHandler::GetRoleMessageReceived, this, &MainWindow::OnRoleMessageReceived);
     connect(_commandHandler.get(), &CommandHandler::UpdateFileList, this, &MainWindow::OnUpdateFileList);
     connect(_commandHandler.get(), &CommandHandler::GetUsersList, this, &MainWindow::OnGetUsersList);
@@ -38,7 +39,9 @@ MainWindow::MainWindow(std::shared_ptr<CommandHandler> commandor, QWidget *paren
 
 }
 
-MainWindow::~MainWindow() {}
+MainWindow::~MainWindow() {
+    std::cout << "fasdf" << std::endl;
+}
 
 void MainWindow::SetupWindow(const QString& username, const QString& token) {
     _token = token.toStdString();
@@ -92,16 +95,13 @@ void MainWindow::CreateDirButtonClicked() {
 
 void MainWindow::OnRoleMessageReceived(const QString& message) {
     ui->roleLine->setText(message);
-    if (message == "common") {
-        ui->usersList->hide();
-    } else if (message == "admin") {
-        _commandHandler->SendCommand(Operation::GetUsersList, {_username, _token});
-        _commandHandler->SendCommand(Operation::GetGroupsList, {_username, _token});
-    }
+    _commandHandler->SendCommand(Operation::GetUsersList, {_username, _token});
+    _commandHandler->SendCommand(Operation::GetGroupsList, {_username, _token});
 }
 
 void MainWindow::OnOperationWithFile(const QString& message) {
     if (message == "Success") {
+        ui->statusbar->showMessage("Success");
         _commandHandler->SendCommand(Operation::GetFileList, {_username, _token});
     } else if (message == "No access") {
         ui->statusbar->showMessage("Have not enough rights");
@@ -113,7 +113,6 @@ void MainWindow::OnOperationWithFile(const QString& message) {
 }
 
 void MainWindow::OnOperationWithGroup(const QString& message) {
-    qDebug() << message;
     if (message == "Success") {
         _commandHandler->SendCommand(Operation::GetGroupsList, {_username, _token});
     } else if (message == "No access") {
@@ -281,7 +280,6 @@ void MainWindow::ShowContextMenu(const QPoint& pos) {
     }
 
     QVariant data = columnIndex.data();
-    qDebug() << "Data from column:" << data.toString();
 
     std::unordered_map<std::string, QAction *> actions;
     actions.emplace("Update", new QAction(tr("Обновить"), this));
@@ -289,6 +287,31 @@ void MainWindow::ShowContextMenu(const QPoint& pos) {
     actions.emplace("Add", new QAction(tr("Добавить в группу"), this));
     actions.emplace("Change_rights", new QAction(tr("Изменить права"), this));
     QMenu* menu = new QMenu(this);
+
+    if (data.toString() == "FILE") {
+        actions.emplace("Write_file", new QAction(tr("Изменить файл"), this));
+        actions.emplace("Read_file", new QAction(tr("Прочитать файл"), this));
+        actions.emplace("Exec_file", new QAction(tr("Выполнить файл"), this));
+
+        connect(actions["Write_file"], &QAction::triggered, this, [this, index]() {
+            std::string fileName = index.data().toString().toStdString();
+            _commandHandler->SendCommand(Operation::WriteToFile, {_username, _token, fileName});
+        });
+
+        connect(actions["Read_file"], &QAction::triggered, this, [this, index]() {
+            std::string fileName = index.data().toString().toStdString();
+            _commandHandler->SendCommand(Operation::ReadFromFile, {_username, _token, fileName});
+        });
+
+        connect(actions["Exec_file"], &QAction::triggered, this, [this, index]() {
+            std::string fileName = index.data().toString().toStdString();
+            _commandHandler->SendCommand(Operation::ExecFile, {_username, _token, fileName});
+        });
+
+        menu->addAction(actions["Write_file"]);
+        menu->addAction(actions["Read_file"]);
+        menu->addAction(actions["Exec_file"]);
+    }
 
     connect(actions["Add"], &QAction::triggered, this, [this, index]() {
         std::string fileName = index.data().toString().toStdString();
@@ -402,7 +425,7 @@ void MainWindow::ShowContextMenu(const QPoint& pos) {
 
 void MainWindow::ShowContextMenuGroups(const QPoint& pos) {
     QModelIndex index = ui->groupsTree->indexAt(pos);
-    if (!index.isValid()) return;
+    if (!index.isValid() || ui->roleLine->text() == "common") return;
 
     if (index.column() == 0 && !index.data().toString().isEmpty()) {
         QMenu contextMenu;
@@ -441,6 +464,12 @@ void MainWindow::ShowContextMenuGroups(const QPoint& pos) {
 
         contextMenu.exec(ui->groupsTree->viewport()->mapToGlobal(pos));
     }
+}
+
+void MainWindow::closeEvent(QCloseEvent *event) {
+    _commandHandler->SendCommand(Operation::QuitSession, {_username, _token});
+    _commandHandler->StopAsyncReading();
+    event->accept();
 }
 
 void MainWindow::NeedUpdateFileList() {

@@ -8,9 +8,8 @@ DECLARE
     existing_group_id INT;
     admin_user_id INT;
 BEGIN
-    SELECT user_id INTO admin_user_id
-    FROM permission_app.users
-    WHERE login = admin_username AND root = TRUE;
+    SELECT permission_app.UserID(admin_username)
+    INTO admin_user_id;
 
     IF admin_user_id IS NULL THEN
         RETURN 'User Not Found';

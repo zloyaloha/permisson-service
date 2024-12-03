@@ -20,9 +20,8 @@ DECLARE
     user_group_id INT;       -- ID группы родительской директории
 BEGIN
     -- Получаем ID пользователя
-    SELECT user_id INTO username_user_id
-    FROM permission_app.users
-    WHERE login = username;
+    SELECT permission_app.UserID(userName)
+    INTO username_user_id;
 
     IF username_user_id IS NULL THEN
         RAISE EXCEPTION 'User not found';

@@ -9,9 +9,8 @@ DECLARE
     creator_user_id INT;
 BEGIN
     -- Получаем user_id пользователя по его имени
-    SELECT user_id INTO creator_user_id
-    FROM permission_app.users
-    WHERE login = creator_username;
+    SELECT permission_app.UserID(creator_username)
+    INTO creator_user_id;
 
     -- Если пользователь не найден, возвращаем 'User Not Found'
     IF creator_user_id IS NULL THEN

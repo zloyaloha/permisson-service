@@ -35,21 +35,17 @@ void Session::ReadMessage() {
                 std::getline(is, data, '\0');
                 std::cout << bytes_transferred << std::endl;
                 _buffer.consume(bytes_transferred);
-                try {
-                    BaseCommand command(data);
-                    if (command._op == Operation::Quit) {
-                        if (command._msg_data[0] != "") { // logged connection
-                            _worker->ProccessOperation(command);
-                        }
-                        _socket->close();
-                        return;
+                BaseCommand command(data);
+                if (command._op == Operation::Quit) {
+                    if (command._msg_data[0] != "") { // logged connection
+                        _worker->ProccessOperation(command);
                     }
-                    NotifyObservers("Сообщение получено\n");
-                    _threadPool.EnqueueTask([this, command] { _worker->ProccessOperation(command); });
-                    ReadMessage();
-                } catch (...) {
-                    std::cout << "Some problems with packet" << std::endl;
+                    _socket->close();
+                    return;
                 }
+                NotifyObservers("Сообщение получено\n");
+                ReadMessage();
+                _threadPool.EnqueueTask([this, command] { _worker->ProccessOperation(command); });
             } else {
                 NotifyObservers("Ошибка при получении сообщения " + ec.message());
                 boost::system::error_code ignored_ec;
@@ -84,6 +80,12 @@ void Worker::PrepareQueries() {
         "SELECT permission_app.IsUserOwnerOrRoot($1, $2)");
     _connection->prepare("is_root",
         "SELECT permission_app.IsRoot($1)");
+    _connection->prepare("check_user_rights_to_write",
+        "SELECT permission_app.CheckUserRightsToWrite($1, $2)");
+    _connection->prepare("check_user_rights_to_read",
+        "SELECT permission_app.CheckUserRightsToRead($1, $2)");
+    _connection->prepare("check_user_rights_to_exec",
+        "SELECT permission_app.CheckUserRightsToExec($1, $2)");
     _connection->prepare("add_event",
         "SELECT permission_app.AddEvent($1, $2, $3)");
     _connection->prepare("update_user_permissions_by_mask",
@@ -183,12 +185,16 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             break;
         case Operation::Quit:
             NotifyObservers("Quit " + command._msg_data[0]);
+            _connection->disconnect();
+            break;
+         case Operation::QuitSession:
+            NotifyObservers("QuitSession " + command._msg_data[0]);
             if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
                 NotifyObservers("Security warning");
                 break;
             }
             Quit(command._msg_data[1]); // user_id
-            _connection->disconnect();
+            SendResponse(command._op, {command._msg_data[1]});
             break;
         case Operation::GetRole:
             NotifyObservers("Get role " + command._msg_data[0]); // username
@@ -313,7 +319,88 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             }
             SendResponse(command._op, {result});
             break;
+        case Operation::WriteToFile:
+            NotifyObservers("WriteToFile " + command._msg_data[0] + ' ' + command._msg_data[2]); // file, permissions
+            if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
+                NotifyObservers("Security warning");
+                break;
+            }
+            if (!CheckUserRightsToWrite(command._msg_data[0], command._msg_data[2]) && !IsRoot(command._msg_data[0])) { // username, file
+                result = "No access";
+            } else {
+                result = "Success";
+            }
+            SendResponse(command._op, {result});
+            break;
+        case Operation::ReadFromFile:
+            NotifyObservers("ReadFromFile " + command._msg_data[0] + ' ' + command._msg_data[2]); // file, permissions
+            if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
+                NotifyObservers("Security warning");
+                break;
+            }
+            if (!CheckUserRightsToRead(command._msg_data[0], command._msg_data[2]) && !IsRoot(command._msg_data[0])) { // username, file
+                result = "No access";
+            } else {
+                result = "Success";
+            }
+            SendResponse(command._op, {result});
+            break;
+        case Operation::ExecFile:
+            NotifyObservers("ExecFile " + command._msg_data[0] + ' ' + command._msg_data[2]); // file, permissions
+            if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
+                NotifyObservers("Security warning");
+                break;
+            }
+            if (!CheckUserRightsToExec(command._msg_data[0], command._msg_data[2]) && !IsRoot(command._msg_data[0])) { // username, file
+                result = "No access";
+            } else {
+                result = "Success";
+            }
+            SendResponse(command._op, {result});
+            break;
     }
+}
+
+bool Worker::CheckUserRightsToWrite(const std::string& userName, const std::string& fileName) {
+    pqxx::work work(*_connection);
+    try {
+        pqxx::result result = work.exec_prepared("check_user_rights_to_write", userName, fileName);
+        if (!result.empty() && result[0][0].is_null() == false) {
+            return result[0][0].as<bool>();
+        }
+    } catch (const std::exception& e) {
+        NotifyObservers("Error: " + std::string(e.what()));
+        return false;
+    }
+    return false;
+}
+
+bool Worker::CheckUserRightsToRead(const std::string& userName, const std::string& fileName) {
+    pqxx::work work(*_connection);
+    try {
+        pqxx::result result = work.exec_prepared("check_user_rights_to_read", userName, fileName);
+        if (!result.empty() && result[0][0].is_null() == false) {
+            return result[0][0].as<bool>();
+        }
+    } catch (const std::exception& e) {
+        NotifyObservers("Error: " + std::string(e.what()));
+        return false;
+    }
+    return false;
+}
+
+bool Worker::CheckUserRightsToExec(const std::string& userName, const std::string& fileName) {
+    pqxx::work work(*_connection);
+    try {
+        pqxx::result result = work.exec_prepared("check_user_rights_to_exec", userName, fileName);
+        if (!result.empty() && result[0][0].is_null() == false) {
+            return result[0][0].as<bool>();
+        }
+    } catch (const std::exception& e) {
+        NotifyObservers("Error: " + std::string(e.what()));
+        return false;
+    }
+    return false;
 }
 
 bool Worker::IsRoot(const std::string& userName) {

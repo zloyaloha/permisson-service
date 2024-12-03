@@ -29,3 +29,5 @@ CREATE TABLE IF NOT EXISTS user_events (
     description VARCHAR(50) DEFAULT '',
     time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+

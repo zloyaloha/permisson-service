@@ -20,14 +20,19 @@ void CommandHandler::Connect() {
 }
 
 void CommandHandler::ConnectToServer(tcp::resolver::results_type& endpoints) {
-    auto self = shared_from_this();
+    auto self = shared_from_this();  // Убедитесь, что shared_ptr доступен
+
+    // Ожидаем подключения к серверу
     boost::asio::async_connect(_socket, endpoints,
-        [this, self](const boost::system::error_code& ec, const tcp::endpoint& endpoint) {
+        [this, self, &endpoints](const boost::system::error_code& ec, const tcp::endpoint& endpoint) {
             if (!ec) {
                 std::cout << "Connected to " << endpoint << std::endl;
-                AsyncReadResponse();
+                StartAsyncReading();  // Запускаем асинхронное чтение после успешного подключения
+                StopAsyncReading();
             } else {
                 std::cerr << "Error connecting: " << ec.message() << std::endl;
+                sleep(1);
+                Connect();
             }
         });
 }
@@ -43,6 +48,9 @@ void CommandHandler::StopAsyncReading() {
 
 void CommandHandler::AsyncReadResponse() {
     auto self(shared_from_this());
+    if (!asyncReadingEnabled) {
+        return;
+    }
     boost::asio::async_read(_socket, responseBuffer, boost::asio::transfer_at_least(1),
         [this, self](boost::system::error_code ec, std::size_t bytes_transferred) {
             if (!ec) {
@@ -54,6 +62,9 @@ void CommandHandler::AsyncReadResponse() {
                 try {
                     BaseCommand command(_buffer);
                     if (command._packetSize <= _buffer.size()) {
+                        if (command._op == Operation::Quit) {
+                            return;
+                        }
                         HandleMessage(command);
                         _buffer = "";
                     }
@@ -91,6 +102,9 @@ void CommandHandler::HandleMessage(const BaseCommand& command) {
         case Operation::CreateDir:
         case Operation::ChangeRights:
         case Operation::DeleteFile:
+        case Operation::ReadFromFile:
+        case Operation::WriteToFile:
+        case Operation::ExecFile:
             emit OperationWithFile(QString::fromStdString(command._msg_data[0]));
             break;
         default:

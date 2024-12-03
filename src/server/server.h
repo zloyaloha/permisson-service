@@ -106,6 +106,9 @@ class Worker : public std::enable_shared_from_this<Worker>, public Observable {
         std::string ChangeRights(const std::string& fileName, const std::string& permissions, const std::string& userName);
         bool IsRootOrOwner(const std::string& userName, const std::string& fileName);
         bool IsRoot(const std::string& userName);
+        bool CheckUserRightsToWrite(const std::string& userName, const std::string& fileName);
+        bool CheckUserRightsToRead(const std::string& userName, const std::string& fileName);
+        bool CheckUserRightsToExec(const std::string& userName, const std::string& fileName);
         void Quit(const std::string& token);
     private:
         std::string SetUserRights(const std::string& fileName, int mask);

@@ -20,7 +20,6 @@ HelloWindow::HelloWindow(QWidget *parent)
     _stringHandler = std::make_shared<StringHandler>();
     ui->stackedWidget->setCurrentIndex(0);
     _commandHandler->Connect();
-    _mainWindow = std::make_shared<MainWindow>(_commandHandler);
     std::thread([&]() { io_context.run(); }).detach();
 }
 
@@ -74,9 +73,11 @@ void HelloWindow::LoginButtonClicked()
     } else if (response._msg_data[0] == "Session exists") {
         ui->statusbar->showMessage("User already authorized");
     } else {
+        _mainWindow = std::make_shared<MainWindow>(_commandHandler);
         ui->statusbar->showMessage("Success login");
         _token = response._msg_data[0];
         _username = login.toStdString();
+        _commandHandler->StartAsyncReading();
         _mainWindow->SetupWindow(login, QString::fromStdString(_token));
     }
 }
