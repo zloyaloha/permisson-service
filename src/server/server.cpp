@@ -1,5 +1,7 @@
 #include "server.h"
 
+namespace bp = boost::process;
+
 void Server::AcceptConnections() {
     NotifyObservers("Server is waiting!");
     _acceptor.async_accept(
@@ -68,7 +70,7 @@ pqxx::result Worker::MakeQuery(const std::string& query) {
 }
 
 Worker::Worker(ThreadPool& threadPool, std::shared_ptr<tcp::socket> socket, std::vector<std::shared_ptr<IServerObserver>>& observers, const Config& conf) 
-    : _threadPool(threadPool), _socket(socket), Observable(observers) 
+    : _threadPool(threadPool), _socket(socket), Observable(observers), _config(conf)
 {
     QString PARAM_STRING = "host=" + conf.DB_HOST + 
         " port=" + conf.DB_PORT + 
@@ -373,8 +375,94 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             }
             SendResponse(command._op, {result});
             break;
+        case Operation::MakeDBCopy:
+            NotifyObservers("MakeDBCopy " + command._msg_data[0] + ' ' + command._msg_data[2]); // user, file
+            if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
+                NotifyObservers("Security warning");
+                break;
+            }
+            if (!IsRoot(command._msg_data[0])) { // username
+                result = "No access";
+            } else {
+                result = CreateBackup(command._msg_data[2]); // username, file
+            }
+            SendResponse(command._op, {result});
+            break;
+        case Operation::RecoverDB:
+            NotifyObservers("RecoverDB " + command._msg_data[0] + ' ' + command._msg_data[2]); // user, file
+            if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
+                NotifyObservers("Security warning");
+                break;
+            }
+            if (!IsRoot(command._msg_data[0])) { // username
+                result = "No access";
+            } else {
+                result = RecoverDB(command._msg_data[2]); // username, file
+            }
+            SendResponse(command._op, {result});
+            break;
     }
     NotifyObservers("Result: " + result);
+}
+
+std::string Worker::CreateBackup(const std::string& fileName) {
+    try {
+        bp::environment env = boost::this_process::environment();
+        env["PGPASSWORD"] = "sap1234";
+
+        std::vector<std::string> args = {
+            "-U", "db_admin", 
+            "-h", _config.DB_HOST.toStdString(),
+            "-p", _config.DB_PORT.toStdString(), 
+            "-d", _config.DB_NAME.toStdString(),
+            "-n", "permission_app",
+            "-F", "c",
+            "-f", fileName,
+            "-O"
+        };
+
+        bp::child c("/usr/bin/pg_dump", bp::args(args), env);
+        c.wait();
+
+        if (c.exit_code() != 0) {
+            throw std::runtime_error("Backup failed with exit code: " + std::to_string(c.exit_code()));
+        }
+
+        return "Backup created successfully!";
+    }
+    catch (const std::exception& e) {
+        return "Error: " + std::string(e.what());
+    }
+}
+
+std::string Worker::RecoverDB(const std::string& fileName) {
+    try {
+        bp::environment env = boost::this_process::environment();
+        env["PGPASSWORD"] = "1234";
+
+        std::vector<std::string> args = {
+            "-U", "zloyaloha",
+            "-h", _config.DB_HOST.toStdString(),
+            "-p", _config.DB_PORT.toStdString(),
+            "-d", _config.DB_NAME.toStdString(),
+            "-n", "permission_app",
+            "--no-owner",
+            "-c",
+            fileName
+        };
+
+        bp::child c("/usr/bin/pg_restore", bp::args(args), env);
+        c.wait();
+
+        if (c.exit_code() != 0) {
+            throw std::runtime_error("Restore failed with exit code: " + std::to_string(c.exit_code()));
+        }
+
+        return "Success";
+    }
+    catch (const std::exception& e) {
+        return "Error";
+    }
 }
 
 void Worker::AddWriteEvent(const std::string& userName, const std::string& fileName) {

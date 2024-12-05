@@ -46,4 +46,5 @@ class CommandHandler: public QObject, public std::enable_shared_from_this<Comman
         void OperationWithGroup(const QString& response);
         void GetUsersList(const QString& response);
         void GetGroupsList(const QString& response);
+        void Close(const QString& response);
 };

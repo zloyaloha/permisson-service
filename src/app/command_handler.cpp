@@ -107,6 +107,9 @@ void CommandHandler::HandleMessage(const BaseCommand& command) {
         case Operation::ExecFile:
             emit OperationWithFile(QString::fromStdString(command._msg_data[0]));
             break;
+        case Operation::RecoverDB:
+            emit Close(QString::fromStdString(command._msg_data[0]));
+            break;
         default:
             break;
     }

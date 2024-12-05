@@ -70,6 +70,7 @@ class MainWindow : public QMainWindow {
         void OnGetGroupsList(const QString& response);
         void OnOperationWithFile(const QString& response);
         void OnOperationWithGroup(const QString& response);
+        void OnLeave(const QString& response);
         void DeleteFile(const QString& filename);
         void NeedUpdateFileList();
     public slots:

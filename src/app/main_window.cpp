@@ -14,6 +14,7 @@ MainWindow::MainWindow(std::shared_ptr<CommandHandler> commandor, QWidget *paren
     connect(_commandHandler.get(), &CommandHandler::UpdateFileList, this, &MainWindow::OnUpdateFileList);
     connect(_commandHandler.get(), &CommandHandler::GetUsersList, this, &MainWindow::OnGetUsersList);
     connect(_commandHandler.get(), &CommandHandler::GetGroupsList, this, &MainWindow::OnGetGroupsList);
+    connect(_commandHandler.get(), &CommandHandler::Close, this, &MainWindow::OnLeave);
 
     connect(_commandHandler.get(), &CommandHandler::OperationWithFile, this, &MainWindow::OnOperationWithFile);
     connect(_commandHandler.get(), &CommandHandler::OperationWithGroup, this, &MainWindow::OnOperationWithGroup);
@@ -151,6 +152,10 @@ void MainWindow::OnRoleMessageReceived(const QString& message) {
     ui->roleLine->setText(message);
     SendCommand(Operation::GetUsersList, {_username, _token});
     SendCommand(Operation::GetGroupsList, {_username, _token});
+}
+
+void MainWindow::OnLeave(const QString& message) {
+    this->close();
 }
 
 void MainWindow::OnOperationWithFile(const QString& message) {
