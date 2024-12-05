@@ -2,9 +2,7 @@
 
 
 CommandHandler::CommandHandler(boost::asio::io_context& io_context, const std::string& host, const std::string& port) : 
-    _io_context(io_context), _socket(io_context), _host(host), _port(port), _resolver(io_context) {
-        // responseBuffer.prepare(8192);
-    }
+    _io_context(io_context), _socket(io_context), _host(host), _port(port), _resolver(io_context) {}
 
 void CommandHandler::Connect() {
     auto self = shared_from_this();
@@ -25,6 +23,7 @@ void CommandHandler::ConnectToServer(tcp::resolver::results_type& endpoints) {
         [this, self, &endpoints](const boost::system::error_code& ec, const tcp::endpoint& endpoint) {
             if (!ec) {
                 std::cout << "Connected to " << endpoint << std::endl;
+                isConnected = true;
                 StartAsyncReading();
             } else {
                 std::cerr << "Error connecting: " << ec.message() << std::endl;
@@ -41,6 +40,10 @@ void CommandHandler::StartAsyncReading() {
 
 void CommandHandler::StopAsyncReading() {
     asyncReadingEnabled = false;
+}
+
+bool CommandHandler::IsConnected() const{
+    return isConnected;
 }
 
 void CommandHandler::AsyncReadResponse() {
@@ -111,7 +114,7 @@ void CommandHandler::HandleMessage(const BaseCommand& command) {
 
 void CommandHandler::SendCommand(const Operation op, const std::initializer_list<std::string>& data) {
     auto self(shared_from_this());
-    BaseCommand msg(op, getpid(), data);
+    BaseCommand msg(op, data);
     boost::asio::async_write(_socket, boost::asio::buffer(msg.toPacket()),
         [this, self](boost::system::error_code ec, std::size_t) {
             if (ec) {
@@ -132,12 +135,12 @@ BaseCommand CommandHandler::ReadResponse() {
 
         BaseCommand command(data);
 
-        std::cout << "Ответ получен: " << data << std::endl;
-
         responseBuffer.consume(data.size());
         
         return command;
     } catch (std::exception& e) {
         std::cerr << "Error while reading response: " << e.what() << std::endl;
+        return BaseCommand("");
     }
+    return BaseCommand("");
 }

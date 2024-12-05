@@ -23,8 +23,25 @@ HelloWindow::HelloWindow(QWidget *parent)
     std::thread([&]() { io_context.run(); }).detach();
 }
 
+bool HelloWindow::SendCommand(const Operation op, const std::initializer_list<std::string>& data) {
+    if (_commandHandler->IsConnected()) {
+        _commandHandler->SendCommand(op, data);
+        return true;
+    }
+    ui->statusbar->showMessage("Server is not connected");
+    return false;
+}
+
+BaseCommand HelloWindow::ReadResponse() {
+    if (_commandHandler->IsConnected()) {
+        return _commandHandler->ReadResponse();
+    }
+    ui->statusbar->showMessage("Server is not connected");
+    return BaseCommand(Operation::Error, {""});
+}
+
 HelloWindow::~HelloWindow() {
-    _commandHandler->SendCommand(Operation::Quit, {_username, _token});
+    SendCommand(Operation::Quit, {_username, _token});
 }
 
 void HelloWindow::ToRegistrationButtonClicked()
@@ -46,8 +63,10 @@ void HelloWindow::RegistrationButtonClicked()
     if (!_stringHandler->ValidInput(login, password)) {
         return;
     }
-    _commandHandler->SendCommand(Operation::Registrate, {login.toStdString(), password.toStdString()});
-    BaseCommand response(_commandHandler->ReadResponse());
+    if (!SendCommand(Operation::Registrate, {login.toStdString(), password.toStdString()})) {
+        return;
+    }
+    BaseCommand response(ReadResponse());
     if (response._msg_data[0] == "Success") {
         QMessageBox::information(this, "Registration", "Success registration");
     } else if (response._msg_data[0] == "Exists") {
@@ -64,8 +83,10 @@ void HelloWindow::LoginButtonClicked()
     if (!_stringHandler->ValidInput(login, password)) {
         return;
     }
-    _commandHandler->SendCommand(Operation::Login, {login.toStdString(), password.toStdString()});
-    BaseCommand response(_commandHandler->ReadResponse());
+    if (!SendCommand(Operation::Login, {login.toStdString(), password.toStdString()})) {
+        return;
+    }
+    BaseCommand response(ReadResponse());
     if (response._msg_data[0] == "Invalid username") {
         ui->statusbar->showMessage("User with this login isn't exist");
     } else if (response._msg_data[0] == "Invalid password") {

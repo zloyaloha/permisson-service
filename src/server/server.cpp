@@ -148,7 +148,7 @@ void Worker::StopActiveSession() {
 
 void Worker::SendResponse(const Operation op, const std::initializer_list<std::string>& data) {
     auto self(shared_from_this());
-    BaseCommand msg(op, getpid(), data);
+    BaseCommand msg(op, data);
     std::string abc = msg.toPacket();
     boost::asio::async_write(*_socket, boost::asio::buffer(msg.toPacket()),
         [this, self](boost::system::error_code ec, std::size_t writed) {

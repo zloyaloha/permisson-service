@@ -62,6 +62,7 @@ class MainWindow : public QMainWindow {
         MainWindow(std::shared_ptr<CommandHandler> commandor, QWidget *pwgt = nullptr);
         ~MainWindow();
         void SetupWindow(const QString& username, const QString& token);
+        void SendCommand(const Operation op, const std::initializer_list<std::string>& data);
     private slots:
         void OnRoleMessageReceived(const QString& role);
         void OnUpdateFileList(const QString& role);
@@ -74,6 +75,8 @@ class MainWindow : public QMainWindow {
     public slots:
         void CreateFileButtonClicked();
         void CreateDirButtonClicked();
+        void MakeCopyButtonClicked();
+        void RecoverDBButtonClicked();
         void CreateGroupButtonClicked();
         void ShowContextMenu(const QPoint& pos);
         void ShowContextMenuGroups(const QPoint& pos);

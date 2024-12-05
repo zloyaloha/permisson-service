@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>526</width>
-    <height>312</height>
+    <width>521</width>
+    <height>316</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -25,6 +25,9 @@
   <property name="windowTitle">
    <string>MainWindow</string>
   </property>
+  <property name="styleSheet">
+   <string notr="true"/>
+  </property>
   <widget class="QWidget" name="main">
    <property name="sizePolicy">
     <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
@@ -38,12 +41,12 @@
      <height>0</height>
     </size>
    </property>
-   <widget class="QWidget" name="">
+   <widget class="QWidget" name="layoutWidget">
     <property name="geometry">
      <rect>
       <x>70</x>
       <y>30</y>
-      <width>381</width>
+      <width>391</width>
       <height>201</height>
      </rect>
     </property>
@@ -81,11 +84,8 @@
          <height>100</height>
         </size>
        </property>
-       <property name="styleSheet">
-        <string notr="true">backgroud-color: rgb(246, 245, 244)</string>
-       </property>
        <property name="currentIndex">
-        <number>0</number>
+        <number>1</number>
        </property>
        <widget class="QWidget" name="loginPage">
         <property name="minimumSize">
@@ -141,7 +141,11 @@
                </widget>
               </item>
               <item row="1" column="1">
-               <widget class="QLineEdit" name="passwordText"/>
+               <widget class="QLineEdit" name="passwordText">
+                <property name="echoMode">
+                 <enum>QLineEdit::Password</enum>
+                </property>
+               </widget>
               </item>
              </layout>
             </item>
@@ -156,6 +160,9 @@
               </item>
               <item>
                <widget class="QPushButton" name="loginButton">
+                <property name="styleSheet">
+                 <string notr="true"/>
+                </property>
                 <property name="text">
                  <string>Вход</string>
                 </property>
@@ -172,7 +179,7 @@
         <widget class="QGroupBox" name="groupBox">
          <property name="geometry">
           <rect>
-           <x>40</x>
+           <x>20</x>
            <y>20</y>
            <width>216</width>
            <height>158</height>
@@ -210,7 +217,11 @@
                </widget>
               </item>
               <item row="1" column="1">
-               <widget class="QLineEdit" name="passwordRegistration"/>
+               <widget class="QLineEdit" name="passwordRegistration">
+                <property name="echoMode">
+                 <enum>QLineEdit::Password</enum>
+                </property>
+               </widget>
               </item>
              </layout>
             </item>
@@ -247,7 +258,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>526</width>
+     <width>521</width>
      <height>20</height>
     </rect>
    </property>

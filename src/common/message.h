@@ -29,7 +29,10 @@ enum Operation {
     WriteToFile,
     ReadFromFile,
     ExecFile,
-    QuitSession
+    QuitSession,
+    Error,
+    MakeDBCopy,
+    RecoverDB
 };
 
 class BaseCommand {
@@ -37,7 +40,7 @@ public:
     Operation _op;
     int32_t _packetSize;
     std::vector<std::string> _msg_data;
-    BaseCommand(Operation op, int32_t pid, const std::initializer_list<std::string>& msg_data) : 
+    BaseCommand(Operation op, const std::initializer_list<std::string>& msg_data) : 
         _op(op), _packetSize(0), _msg_data(msg_data) {
             _packetSize += std::to_string(_op).size();
             _packetSize += 8;

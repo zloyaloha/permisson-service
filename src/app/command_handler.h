@@ -25,6 +25,7 @@ class CommandHandler: public QObject, public std::enable_shared_from_this<Comman
         boost::asio::streambuf responseBuffer;
         std::string _buffer{""};
         bool asyncReadingEnabled{false};
+        bool isConnected{false};
         std::string _host, _port;
     public:
         CommandHandler(boost::asio::io_context& io_context, const std::string& host, const std::string& port);
@@ -34,6 +35,7 @@ class CommandHandler: public QObject, public std::enable_shared_from_this<Comman
         void StartAsyncReading();
         void StopAsyncReading();
         void AsyncReadResponse();
+        bool IsConnected() const;
     private:
         void ConnectToServer(tcp::resolver::results_type& endpoints);
         void HandleMessage(const BaseCommand& command);

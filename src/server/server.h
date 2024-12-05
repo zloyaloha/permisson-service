@@ -4,6 +4,8 @@
 #include <boost/asio.hpp>
 #include <boost/beast.hpp>
 #include <boost/bind/bind.hpp>
+#include <boost/process.hpp>
+#include <boost/filesystem.hpp>
 
 #include <string>
 #include <ctime>
@@ -112,6 +114,8 @@ class Worker : public std::enable_shared_from_this<Worker>, public Observable {
         void AddReadEvent(const std::string& userName, const std::string& fileName);
         void AddExecEvent(const std::string& userName, const std::string& fileName);
         void Quit(const std::string& token);
+        std::string CreateBackup(const std::string& filePath);
+        std::string RecoverDB(const std::string& filePath);
     private:
         std::string SetUserRights(const std::string& fileName, int mask);
         std::string SetGroupRights(const std::string& fileName, int mask);
@@ -137,6 +141,7 @@ class Worker : public std::enable_shared_from_this<Worker>, public Observable {
         ThreadPool& _threadPool;
         std::unique_ptr<pqxx::connection> _connection;
         std::shared_ptr<tcp::socket> _socket;
+        Config _config;
 };
 
 class Session : public std::enable_shared_from_this<Session>, public Observable {

@@ -30,6 +30,8 @@ class HelloWindow : public QMainWindow {
     public:
         HelloWindow(QWidget *pwgt = nullptr);
         ~HelloWindow();
+        bool SendCommand(const Operation op, const std::initializer_list<std::string>& data);
+        BaseCommand ReadResponse();
     public slots:
         void ToRegistrationButtonClicked();
         void RegistrationButtonClicked();

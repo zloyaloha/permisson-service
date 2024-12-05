@@ -24,6 +24,8 @@ MainWindow::MainWindow(std::shared_ptr<CommandHandler> commandor, QWidget *paren
     connect(ui->listTree, SIGNAL(customContextMenuRequested(QPoint)), SLOT(ShowContextMenu(QPoint)));
     connect(ui->groupsTree, &QTreeView::customContextMenuRequested, this, &MainWindow::ShowContextMenuGroups);
 
+    connect(ui->makeDBCopy, &QPushButton::clicked, this, &MainWindow::MakeCopyButtonClicked);
+    connect(ui->recoverDB, &QPushButton::clicked, this, &MainWindow::RecoverDBButtonClicked);
 
     ui->listTree->setEditTriggers(QAbstractItemView::NoEditTriggers);
     QFile file(":/styles/styles.qss");
@@ -39,16 +41,24 @@ MainWindow::MainWindow(std::shared_ptr<CommandHandler> commandor, QWidget *paren
 
 }
 
-MainWindow::~MainWindow() {
-    std::cout << "fasdf" << std::endl;
+
+
+void MainWindow::SendCommand(const Operation op, const std::initializer_list<std::string>& data) {
+    if (_commandHandler->IsConnected()) {
+        _commandHandler->SendCommand(op, data);
+        return;
+    }
+    ui->statusbar->showMessage("Server is not connected");
 }
+
+MainWindow::~MainWindow() {}
 
 void MainWindow::SetupWindow(const QString& username, const QString& token) {
     _token = token.toStdString();
     _username = username.toStdString();
     ui->usernameLine->setText(username);
-    _commandHandler->SendCommand(Operation::GetRole, {_username, _token});
-    _commandHandler->SendCommand(Operation::GetFileList, {_username, _token});
+    SendCommand(Operation::GetRole, {_username, _token});
+    SendCommand(Operation::GetFileList, {_username, _token});
     this->show();
 }
 
@@ -61,18 +71,62 @@ void MainWindow::CreateFileButtonClicked() {
     if (lastSlashPos == std::string::npos) {
         std::string path = "";
         std::string filename = pathToFile;
-        _commandHandler->SendCommand(Operation::CreateFile, {_username, _token, path, filename});
+        SendCommand(Operation::CreateFile, {_username, _token, path, filename});
     } else {
         std::string path = pathToFile.substr(0, lastSlashPos);
         std::string filename = pathToFile.substr(lastSlashPos + 1);
-        _commandHandler->SendCommand(Operation::CreateFile, {_username, _token, path, filename});
+        SendCommand(Operation::CreateFile, {_username, _token, path, filename});
     }
 }
+
+void MainWindow::MakeCopyButtonClicked() {
+    QDialog dialog(this);
+    dialog.setWindowTitle("Сохранение");
+    QVBoxLayout* layout = new QVBoxLayout(&dialog);
+    QLabel* label = new QLabel("Введите путь до файла", &dialog);
+    layout->addWidget(label);
+    QLineEdit* lineEdit = new QLineEdit(&dialog);
+    layout->addWidget(lineEdit);
+    QPushButton* submitButton = new QPushButton("Подтвердить", &dialog);
+    layout->addWidget(submitButton);
+    connect(submitButton, &QPushButton::clicked, &dialog, [&dialog, lineEdit, this]() {
+        QString fileName = lineEdit->text();
+        if (!fileName.isEmpty()) {
+            SendCommand(Operation::MakeDBCopy, {_username, _token, fileName.toStdString()});
+        }
+        dialog.accept();
+    });
+
+    dialog.setLayout(layout);
+    dialog.exec();
+}
+
+void MainWindow::RecoverDBButtonClicked() {
+    QDialog dialog(this);
+    dialog.setWindowTitle("Восстановление");
+    QVBoxLayout* layout = new QVBoxLayout(&dialog);
+    QLabel* label = new QLabel("Введите путь до файла", &dialog);
+    layout->addWidget(label);
+    QLineEdit* lineEdit = new QLineEdit(&dialog);
+    layout->addWidget(lineEdit);
+    QPushButton* submitButton = new QPushButton("Подтвердить", &dialog);
+    layout->addWidget(submitButton);
+    connect(submitButton, &QPushButton::clicked, &dialog, [&dialog, lineEdit, this]() {
+        QString fileName = lineEdit->text();
+        if (!fileName.isEmpty()) {
+            SendCommand(Operation::RecoverDB, {_username, _token, fileName.toStdString()});
+        }
+        dialog.accept();
+    });
+    dialog.setLayout(layout);
+    dialog.exec();
+}
+
 
 void MainWindow::CreateGroupButtonClicked() {
     std::string groupName = ui->groupCreate->text().toStdString();
     if (groupName != "") {
-        _commandHandler->SendCommand(Operation::CreateGroup, {_username, _token, groupName});
+        SendCommand(Operation::CreateGroup, {_username, _token, groupName});
     }
 }
 
@@ -85,24 +139,24 @@ void MainWindow::CreateDirButtonClicked() {
     if (lastSlashPos == std::string::npos) {
         std::string path = "";
         std::string filename = pathToFile;
-        _commandHandler->SendCommand(Operation::CreateDir, {_username, _token, path, filename});
+        SendCommand(Operation::CreateDir, {_username, _token, path, filename});
     } else {
         std::string path = pathToFile.substr(0, lastSlashPos);
         std::string filename = pathToFile.substr(lastSlashPos + 1);
-        _commandHandler->SendCommand(Operation::CreateDir, {_username, _token, path, filename});
+        SendCommand(Operation::CreateDir, {_username, _token, path, filename});
     }
 }
 
 void MainWindow::OnRoleMessageReceived(const QString& message) {
     ui->roleLine->setText(message);
-    _commandHandler->SendCommand(Operation::GetUsersList, {_username, _token});
-    _commandHandler->SendCommand(Operation::GetGroupsList, {_username, _token});
+    SendCommand(Operation::GetUsersList, {_username, _token});
+    SendCommand(Operation::GetGroupsList, {_username, _token});
 }
 
 void MainWindow::OnOperationWithFile(const QString& message) {
     if (message == "Success") {
         ui->statusbar->showMessage("Success");
-        _commandHandler->SendCommand(Operation::GetFileList, {_username, _token});
+        SendCommand(Operation::GetFileList, {_username, _token});
     } else if (message == "No access") {
         ui->statusbar->showMessage("Have not enough rights");
     } else if (message == "File exists") {
@@ -114,7 +168,7 @@ void MainWindow::OnOperationWithFile(const QString& message) {
 
 void MainWindow::OnOperationWithGroup(const QString& message) {
     if (message == "Success") {
-        _commandHandler->SendCommand(Operation::GetGroupsList, {_username, _token});
+        SendCommand(Operation::GetGroupsList, {_username, _token});
     } else if (message == "No access") {
         ui->statusbar->showMessage("Have not enough rights");
     } else if (message == "User Not Found") {
@@ -295,17 +349,17 @@ void MainWindow::ShowContextMenu(const QPoint& pos) {
 
         connect(actions["Write_file"], &QAction::triggered, this, [this, index]() {
             std::string fileName = index.data().toString().toStdString();
-            _commandHandler->SendCommand(Operation::WriteToFile, {_username, _token, fileName});
+            SendCommand(Operation::WriteToFile, {_username, _token, fileName});
         });
 
         connect(actions["Read_file"], &QAction::triggered, this, [this, index]() {
             std::string fileName = index.data().toString().toStdString();
-            _commandHandler->SendCommand(Operation::ReadFromFile, {_username, _token, fileName});
+            SendCommand(Operation::ReadFromFile, {_username, _token, fileName});
         });
 
         connect(actions["Exec_file"], &QAction::triggered, this, [this, index]() {
             std::string fileName = index.data().toString().toStdString();
-            _commandHandler->SendCommand(Operation::ExecFile, {_username, _token, fileName});
+            SendCommand(Operation::ExecFile, {_username, _token, fileName});
         });
 
         menu->addAction(actions["Write_file"]);
@@ -328,7 +382,7 @@ void MainWindow::ShowContextMenu(const QPoint& pos) {
         connect(submitButton, &QPushButton::clicked, &dialog, [&dialog, lineEdit, fileName, this]() {
             QString enteredGroup = lineEdit->text();
             if (!enteredGroup.isEmpty()) {
-                _commandHandler->SendCommand(Operation::AddFileToGroup, {_username, _token, fileName, enteredGroup.toStdString()});
+                SendCommand(Operation::AddFileToGroup, {_username, _token, fileName, enteredGroup.toStdString()});
             }
             dialog.accept();
         });
@@ -406,7 +460,7 @@ void MainWindow::ShowContextMenu(const QPoint& pos) {
                     }
                 }
             }
-            _commandHandler->SendCommand(Operation::ChangeRights, {_username, _token, fileName, permissions.toStdString()});
+            SendCommand(Operation::ChangeRights, {_username, _token, fileName, permissions.toStdString()});
             dialog.accept();
         });
 
@@ -425,10 +479,13 @@ void MainWindow::ShowContextMenu(const QPoint& pos) {
 
 void MainWindow::ShowContextMenuGroups(const QPoint& pos) {
     QModelIndex index = ui->groupsTree->indexAt(pos);
-    if (!index.isValid() || ui->roleLine->text() == "common") return;
-
-    if (index.column() == 0 && !index.data().toString().isEmpty()) {
-        QMenu contextMenu;
+    if (!index.isValid()) return;
+    QMenu contextMenu;
+    QAction* updateList = contextMenu.addAction("Обновить");
+    connect(updateList, &QAction::triggered, this, [this, index]() {
+        SendCommand(Operation::GetGroupsList, {_username, _token});
+    });
+    if (index.column() == 0 && !index.data().toString().isEmpty() && ui->roleLine->text() != "common") {
         QAction* addUser = contextMenu.addAction("Добавить пользователя");
         QAction* deleteGroup = contextMenu.addAction("Удалить группу");
 
@@ -448,7 +505,7 @@ void MainWindow::ShowContextMenuGroups(const QPoint& pos) {
             connect(submitButton, &QPushButton::clicked, &dialog, [&dialog, lineEdit, groupName, this]() {
                 QString enteredUser = lineEdit->text();
                 if (!enteredUser.isEmpty()) {
-                    _commandHandler->SendCommand(Operation::AddUserToGroup, {_username, _token, groupName, enteredUser.toStdString()});
+                    SendCommand(Operation::AddUserToGroup, {_username, _token, groupName, enteredUser.toStdString()});
                 }
                 dialog.accept();
             });
@@ -459,26 +516,25 @@ void MainWindow::ShowContextMenuGroups(const QPoint& pos) {
 
         connect(deleteGroup, &QAction::triggered, this, [this, index]() {
             std::string groupName = index.data().toString().toStdString();
-            _commandHandler->SendCommand(Operation::DeleteGroup, {_username, _token, groupName});
+            SendCommand(Operation::DeleteGroup, {_username, _token, groupName});
         });
 
-        contextMenu.exec(ui->groupsTree->viewport()->mapToGlobal(pos));
     }
+    contextMenu.exec(ui->groupsTree->viewport()->mapToGlobal(pos));
 }
 
 void MainWindow::closeEvent(QCloseEvent *event) {
-    _commandHandler->SendCommand(Operation::QuitSession, {_username, _token});
-    _commandHandler->StopAsyncReading();
+    SendCommand(Operation::QuitSession, {_username, _token});
     event->accept();
 }
 
 void MainWindow::NeedUpdateFileList() {
-    _commandHandler->SendCommand(Operation::GetFileList, {_username, _token});
+    SendCommand(Operation::GetFileList, {_username, _token});
 }
 
 void MainWindow::DeleteFile(const QString& filename) {
     std::string file = filename.toStdString();
-    _commandHandler->SendCommand(Operation::DeleteFile, {_username, _token, file});
+    SendCommand(Operation::DeleteFile, {_username, _token, file});
 }
 
 JsonTreeHandler::JsonTreeHandler() : model(nullptr) {}

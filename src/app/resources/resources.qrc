@@ -17,5 +17,6 @@
 
     <qresource prefix="/styles">
         <file alias="styles.qss">styles.qss</file>
+        <file alias="hello.qss">hello.qss</file>
     </qresource>
 </RCC>
