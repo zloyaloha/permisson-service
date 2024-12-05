@@ -136,16 +136,22 @@ void Worker::PrepareQueries() {
         "CALL permission_app.AddWriteEvent($1, $2)");
     _connection->prepare("add_exec_event",
         "CALL permission_app.AddExecEvent($1, $2)");
+    _connection->prepare("stop_active_sessions",
+        "SELECT permission_app.DeleteActiveSessions()");
+    _connection->prepare("get_token",
+        "SELECT permission_app.GetToken($1)");
 }
 
 void Worker::StopActiveSession() {
+    pqxx::work work(*_connection);
     try {
-        pqxx::work work(*_connection);
-        pqxx::result result = work.exec("SELECT permission_app.DeleteActiveSessions();");
-        work.commit();
-    } catch (std::string error) {
-        NotifyObservers("Error: " + error);
+        pqxx::result result = work.exec_prepared("stop_active_sessions");
+    } catch (const std::exception& e) {
+        NotifyObservers("Error: " + std::string(e.what()));
+        return;
     }
+    work.commit();
+    return;
 }
 
 void Worker::SendResponse(const Operation op, const std::initializer_list<std::string>& data) {
@@ -172,14 +178,15 @@ bool Worker::ValidateRequest(const std::string& username, const std::string& tok
 }
 
 std::string Worker::GetToken(const std::string& username) {
+    pqxx::work work(*_connection);
     try {
-        pqxx::work work(*_connection);
-        pqxx::result result = work.exec("SELECT permission_app.GetToken(" + work.quote(username) + ");");
-        work.commit();
+        pqxx::result result = work.exec_prepared("get_token", username);
         return GetStringQueryResult(result);
-    } catch (std::string error) {
-        NotifyObservers("Error: " + error); 
+    } catch (const std::exception& e) {
+        NotifyObservers("Error: " + std::string(e.what()));
+        return "";
     }
+    work.commit();
     return "";
 }
 
@@ -457,7 +464,7 @@ std::string Worker::RecoverDB(const std::string& fileName) {
         if (c.exit_code() != 0) {
             throw std::runtime_error("Restore failed with exit code: " + std::to_string(c.exit_code()));
         }
-
+        StopActiveSession();
         return "Success";
     }
     catch (const std::exception& e) {
@@ -801,6 +808,7 @@ std::string Worker::CreateDir(const std::string& username, const std::string& pa
 void Worker::Quit(const std::string& token) {
     std::string output;
     pqxx::work work(*_connection);
+    std::cout << "AAAAAAAA" << token << std::endl;
     try {
         pqxx::result result = work.exec_prepared("quit", token);
     } catch (const std::exception& e) {
