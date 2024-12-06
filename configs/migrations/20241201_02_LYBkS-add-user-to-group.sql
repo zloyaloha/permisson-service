@@ -30,11 +30,36 @@ BEGIN
     VALUES (v_user_id, v_group_id)
     ON CONFLICT (user_id, group_id) DO NOTHING;
 
-    INSERT INTO permission_app.user_events(user_id, event, description)
-    VALUES (v_user_id, 'ADD_USER_TO_GROUP', p_login);
-
     RETURN 'Success';
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 GRANT EXECUTE ON FUNCTION permission_app.AddUserToGroup(TEXT, TEXT) TO app_user;
+
+CREATE OR REPLACE FUNCTION permission_app.AddUserToGroupEvent()
+RETURNS TRIGGER AS $$
+DECLARE
+    u_login TEXT;
+    g_group_name TEXT;
+BEGIN
+
+    SELECT login INTO u_login
+    FROM permission_app.users
+    WHERE user_id = NEW.user_id;
+
+    SELECT name INTO g_group_name
+    FROM permission_app.groups
+    WHERE group_id = NEW.group_id;
+
+    INSERT INTO permission_app.user_events(user_id, event, description)
+    VALUES (NEW.user_id, 'ADD_USER_TO_GROUP', u_login || ' ' || g_group_name);
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS AddUserToGroupEventTrigger ON permission_app.user_to_group;
+CREATE TRIGGER AddUserToGroupEventTrigger
+AFTER INSERT ON permission_app.user_to_group
+FOR EACH ROW
+EXECUTE FUNCTION permission_app.AddUserToGroupEvent();

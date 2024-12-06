@@ -1,5 +1,6 @@
 -- Create users and group
 -- depends: 
+DROP TYPE IF EXISTS user_event_type CASCADE;
 CREATE TYPE user_event_type AS ENUM ('CREATE_GROUP', 'DELETE_GROUP', 'ADD_USER_TO_GROUP', 'ADD_FILE_TO_GROUP');
 
 CREATE TABLE IF NOT EXISTs users (
@@ -26,7 +27,7 @@ CREATE TABLE IF NOT EXISTS user_to_group (
 CREATE TABLE IF NOT EXISTS user_events (
     user_id INTEGER REFERENCES users(user_id),
     event user_event_type,
-    description VARCHAR(50) DEFAULT '',
+    description VARCHAR(255) DEFAULT '',
     time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -1,6 +1,9 @@
 -- File table
 -- depends: 20241108_04_CHDdk-off-session
 
+DROP TYPE IF EXISTS event_type CASCADE;
+DROP TYPE IF EXISTS file_type CASCADE;
+
 CREATE TYPE event_type AS ENUM ('READ', 'WRITE', 'EXECUTE', 'DELETE', 'CHANGE_PERMISSION', 'CREATE_FILE', 'CREATE_DIR');
 CREATE TYPE file_type AS ENUM ('FILE', 'DIR');
 
