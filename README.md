@@ -1,10 +1,32 @@
 ### Установка
 
 ```bash
-sudo apt-get install qt5-default
-sudo apt-get install qtbase5-dev
-sudo apt-get install libboost-all-dev
-sudo apt install libpqxx-dev
-pip install yoyo-migrations
-sudo apt-get install libsodium-dev
+chmod +x install.sh
+./install.sh
 ```
+
+### Запуск всего
+
+- Поднимаем базу
+``` bash 
+cd configs/
+docker-compose up &
+yoyo apply
+cd ..
+```
+- Собираем приложение.
+```bash
+mkdir build
+cd build
+cmake ..
+make
+```
+- Запускаем сервер (в отдельном терминале)
+```bash
+./src/server/server
+```
+- Запускаем клиент (в отдельном терминале)
+```bash
+./src/app/app
+```
+
