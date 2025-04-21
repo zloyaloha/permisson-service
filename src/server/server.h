@@ -6,6 +6,9 @@
 #include <boost/bind/bind.hpp>
 #include <boost/process.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
 
 #include <string>
 #include <ctime>
@@ -23,6 +26,8 @@
 #include <QString>
 #include <QStringList>
 #include <QDebug>
+
+#include <sw/redis++/redis++.h>
 
 #include "thread_pool.h"
 #include "message.h"
@@ -105,6 +110,7 @@ class Worker : public std::enable_shared_from_this<Worker>, public Observable {
         std::string DeleteGroup(const std::string& groupName, const std::string& userName);
         std::string AddFileToGroup(const std::string& fileName, const std::string& groupName, const std::string& userName);
         std::string ChangeRights(const std::string& fileName, const std::string& permissions, const std::string& userName);
+        std::string GenerateToken() const;
         bool IsRootOrOwner(const std::string& userName, const std::string& fileName);
         bool IsRoot(const std::string& userName);
         bool CheckUserRightsToWrite(const std::string& userName, const std::string& fileName);
@@ -113,7 +119,12 @@ class Worker : public std::enable_shared_from_this<Worker>, public Observable {
         void AddWriteEvent(const std::string& userName, const std::string& fileName);
         void AddReadEvent(const std::string& userName, const std::string& fileName);
         void AddExecEvent(const std::string& userName, const std::string& fileName);
-        void Quit(const std::string& token);
+        void Quit(const std::string& token, const std::string& username);
+        void SaveActiveSession(int user_id, const std::string& ip);
+        bool IsUserActive(int user_id) const;
+        void UpdateActivity(const std::string& username);
+        void PrintActiveSessions() const;
+        void LoginEvent(const std::string& username, int id) const;
         std::string CreateBackup(const std::string& filePath);
         std::string RecoverDB(const std::string& filePath);
     private:
@@ -134,12 +145,14 @@ class Worker : public std::enable_shared_from_this<Worker>, public Observable {
         int SetMask(int start, const std::string& permissions);
         std::string GetStringQueryResult(const pqxx::result& result) const;
         std::pair<std::string, std::string> GetPairQueryResult(const pqxx::result& result) const;
+        std::vector<int> authorized_users;
         pqxx::result MakeQuery(const std::string& query);
         void PrepareQueries();
     private:
         JsonHandler _jsonHandler;
         ThreadPool& _threadPool;
         std::unique_ptr<pqxx::connection> _connection;
+        std::unique_ptr<sw::redis::Redis> _connectionRedis;
         std::shared_ptr<tcp::socket> _socket;
         Config _config;
 };
@@ -150,7 +163,7 @@ public:
     void Start();
 private:
     void ReadMessage();
-    
+
     std::shared_ptr<tcp::socket> _socket;
     boost::asio::streambuf _buffer;
     ThreadPool& _threadPool;

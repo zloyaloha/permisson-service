@@ -8,7 +8,7 @@ void Server::AcceptConnections() {
         [this](boost::system::error_code ec, tcp::socket socket) {
             if (!ec) {
                 NotifyObservers("Client connected!");
-                auto socketPtr = std::make_shared<tcp::socket>(std::move(socket)); 
+                auto socketPtr = std::make_shared<tcp::socket>(std::move(socket));
                 std::make_shared<Session>(socketPtr, _observers, _threadPool, _config)->Start();
             } else {
                 NotifyObservers("ERROR while connecting" + ec.message());
@@ -35,7 +35,6 @@ void Session::ReadMessage() {
                 std::istream is(&_buffer);
                 std::string data;
                 std::getline(is, data, '\0');
-                std::cout << bytes_transferred << std::endl;
                 _buffer.consume(bytes_transferred);
                 BaseCommand command(data);
                 if (command._op == Operation::Quit) {
@@ -64,20 +63,21 @@ pqxx::result Worker::MakeQuery(const std::string& query) {
         result = work.exec(query);
         work.commit();
     } catch (std::string error) {
-        NotifyObservers("Error: " + error); 
+        NotifyObservers("Error: " + error);
     }
     return result;
 }
 
-Worker::Worker(ThreadPool& threadPool, std::shared_ptr<tcp::socket> socket, std::vector<std::shared_ptr<IServerObserver>>& observers, const Config& conf) 
+Worker::Worker(ThreadPool& threadPool, std::shared_ptr<tcp::socket> socket, std::vector<std::shared_ptr<IServerObserver>>& observers, const Config& conf)
     : _threadPool(threadPool), _socket(socket), Observable(observers), _config(conf)
 {
-    QString PARAM_STRING = "host=" + conf.DB_HOST + 
-        " port=" + conf.DB_PORT + 
-        " dbname=" + conf.DB_NAME + 
-        " user=" + conf.DB_USER + 
+    QString PARAM_STRING = "host=" + conf.DB_HOST +
+        " port=" + conf.DB_PORT +
+        " dbname=" + conf.DB_NAME +
+        " user=" + conf.DB_USER +
         " password=" + conf.DB_PASSWORD;
     _connection = std::make_unique<pqxx::connection>(PARAM_STRING.toStdString());
+    _connectionRedis = std::make_unique<sw::redis::Redis>("tcp://127.0.0.1:6379");
     PrepareQueries();
 }
 
@@ -170,11 +170,20 @@ void Worker::SendResponse(const Operation op, const std::initializer_list<std::s
 }
 
 bool Worker::ValidateRequest(const std::string& username, const std::string& token) {
-    std::string userToken = GetToken(username);
-    if (userToken == token) {
+
+    auto user_id_opt = _connectionRedis->get("auth:" + token);
+
+    if (user_id_opt) {
+        std::string user_id = *user_id_opt;
+        std::cout << "Authorized user_id = " << user_id << std::endl;
+        // Тут можно обновить last_activity в PostgreSQL:
+        // txn.exec_params("UPDATE permission_app.sessions SET last_activity = NOW() WHERE session_token = $1", token);
         return true;
+    } else {
+        return false;
+        // Токен не найден в Redis — значит истёк или удалён
+        std::cerr << "Unauthorized: invalid or expired token" << std::endl;
     }
-    return false;
 }
 
 std::string Worker::GetToken(const std::string& username) {
@@ -193,11 +202,12 @@ std::string Worker::GetToken(const std::string& username) {
 
 void Worker::ProccessOperation(const BaseCommand &command) {
     static std::string result;
+    PrintActiveSessions();
     switch (command._op) {
         case Operation::Registrate:
             NotifyObservers("Registrate " + command._msg_data[0]);
             result = Registrate(command._msg_data[0], command._msg_data[1]); // login, password
-            SendResponse(command._op, {result}); // 
+            SendResponse(command._op, {result});
             break;
         case Operation::Login:
             NotifyObservers("Log in " + command._msg_data[0]);
@@ -214,10 +224,11 @@ void Worker::ProccessOperation(const BaseCommand &command) {
                 NotifyObservers("Security warning");
                 break;
             }
-            Quit(command._msg_data[1]); // user_id
+            Quit(command._msg_data[1], command._msg_data[0]); // token, username
             SendResponse(command._op, {command._msg_data[1]});
             break;
         case Operation::GetRole:
+            UpdateActivity(command._msg_data[0]);
             NotifyObservers("Get role " + command._msg_data[0]); // username
             if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
                 NotifyObservers("Security warning");
@@ -227,6 +238,7 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             SendResponse(command._op, {result});
             break;
         case Operation::CreateFile:
+            UpdateActivity(command._msg_data[0]);
             NotifyObservers("Create file " + command._msg_data[0] + ' ' + command._msg_data[2] + ' ' + command._msg_data[3]); // username
             if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
                 NotifyObservers("Security warning");
@@ -236,6 +248,7 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             SendResponse(command._op, {result});
             break;
         case Operation::CreateDir:
+            UpdateActivity(command._msg_data[0]);
             NotifyObservers("Create file " + command._msg_data[0] + ' ' + command._msg_data[2] + ' ' + command._msg_data[3]); // username
             if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
                 NotifyObservers("Security warning");
@@ -245,6 +258,7 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             SendResponse(command._op, {result});
             break;
         case Operation::DeleteFile:
+            UpdateActivity(command._msg_data[0]);
             NotifyObservers("Delete file " + command._msg_data[2]); // filename
             if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
                 NotifyObservers("Security warning");
@@ -258,6 +272,7 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             SendResponse(command._op, {result});
             break;
         case Operation::GetFileList:
+            UpdateActivity(command._msg_data[0]);
             NotifyObservers("GetFileList file " + command._msg_data[0]); // username
             if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
                 NotifyObservers("Security warning");
@@ -267,6 +282,7 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             SendResponse(command._op, {result});
             break;
         case Operation::GetUsersList:
+            UpdateActivity(command._msg_data[0]);
             NotifyObservers("GetUsersList " + command._msg_data[0]); // username
             if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
                 NotifyObservers("Security warning");
@@ -276,6 +292,7 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             SendResponse(command._op, {result});
             break;
         case Operation::GetGroupsList:
+            UpdateActivity(command._msg_data[0]);
             NotifyObservers("GetGroupsList " + command._msg_data[0]); // username
             if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
                 NotifyObservers("Security warning");
@@ -285,6 +302,7 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             SendResponse(command._op, {result});
             break;
         case Operation::AddUserToGroup:
+            UpdateActivity(command._msg_data[0]);
             NotifyObservers("AddUserToGroup " + command._msg_data[2]); // group
             if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // acceptor username, token
                 NotifyObservers("Security warning");
@@ -298,6 +316,7 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             SendResponse(command._op, {result});
             break;
         case Operation::CreateGroup:
+            UpdateActivity(command._msg_data[0]);
             NotifyObservers("CreateGroup " + command._msg_data[2]); // group
             if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // acceptor username, token
                 NotifyObservers("Security warning");
@@ -310,6 +329,7 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             SendResponse(command._op, {result});
             break;
         case Operation::DeleteGroup:
+            UpdateActivity(command._msg_data[0]);
             NotifyObservers("DeleteGroup " + command._msg_data[2]); // group
             if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
                 NotifyObservers("Security warning");
@@ -319,6 +339,7 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             SendResponse(command._op, {result});
             break;
         case Operation::AddFileToGroup:
+            UpdateActivity(command._msg_data[0]);
             NotifyObservers("AddFileToGroup " + command._msg_data[2] + ' ' + command._msg_data[3]); // file, group
             if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
                 NotifyObservers("Security warning");
@@ -328,6 +349,7 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             SendResponse(command._op, {result});
             break;
         case Operation::ChangeRights:
+            UpdateActivity(command._msg_data[0]);
             NotifyObservers("ChangeRights " + command._msg_data[2] + ' ' + command._msg_data[3]); // file, permissions
             if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
                 NotifyObservers("Security warning");
@@ -341,6 +363,7 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             SendResponse(command._op, {result});
             break;
         case Operation::WriteToFile:
+            UpdateActivity(command._msg_data[0]);
             NotifyObservers("WriteToFile " + command._msg_data[0] + ' ' + command._msg_data[2]); // file, permissions
             if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
                 NotifyObservers("Security warning");
@@ -355,6 +378,7 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             SendResponse(command._op, {result});
             break;
         case Operation::ReadFromFile:
+            UpdateActivity(command._msg_data[0]);
             NotifyObservers("ReadFromFile " + command._msg_data[0] + ' ' + command._msg_data[2]); // file, permissions
             if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
                 NotifyObservers("Security warning");
@@ -369,6 +393,7 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             SendResponse(command._op, {result});
             break;
         case Operation::ExecFile:
+            UpdateActivity(command._msg_data[0]);
             NotifyObservers("ExecFile " + command._msg_data[0] + ' ' + command._msg_data[2]); // file, permissions
             if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
                 NotifyObservers("Security warning");
@@ -383,6 +408,7 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             SendResponse(command._op, {result});
             break;
         case Operation::MakeDBCopy:
+            UpdateActivity(command._msg_data[0]);
             NotifyObservers("MakeDBCopy " + command._msg_data[0] + ' ' + command._msg_data[2]); // user, file
             if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
                 NotifyObservers("Security warning");
@@ -396,6 +422,7 @@ void Worker::ProccessOperation(const BaseCommand &command) {
             SendResponse(command._op, {result});
             break;
         case Operation::RecoverDB:
+            UpdateActivity(command._msg_data[0]);
             NotifyObservers("RecoverDB " + command._msg_data[0] + ' ' + command._msg_data[2]); // user, file
             if (!ValidateRequest(command._msg_data[0], command._msg_data[1])) { // username, token
                 NotifyObservers("Security warning");
@@ -732,15 +759,37 @@ std::string Worker::GetGroupsList() {
 std::string Worker::GetUsersList() {
     std::string output;
     pqxx::work work(*_connection);
+
     try {
         pqxx::result result = work.exec_prepared("get_users_list");
-        QJsonObject usersList = _jsonHandler.GenerateUsersList(result);
+
+        QJsonArray usersArray;
+
+        for (const auto& row : result) {
+            int user_id = row["id"].as<int>();
+            QString username = QString::fromStdString(row["login"].as<std::string>());
+
+            std::string sessionKey = "session:" + std::to_string(user_id);
+            bool isOnline = _connectionRedis->exists(sessionKey) > 0;
+
+            QJsonObject userJson;
+            userJson["username"] = username;
+            userJson["is_admin"] = row["is_admin"].as<bool>();
+            userJson["is_active"] = isOnline;
+
+            usersArray.append(userJson);
+        }
+
+        QJsonObject usersList;
+        usersList["users"] = usersArray;
         QJsonDocument doc(usersList);
         output = doc.toJson(QJsonDocument::Compact).toStdString();
+
     } catch (const std::exception& e) {
         NotifyObservers("Error: " + std::string(e.what()));
         return "Error";
     }
+
     return output;
 }
 
@@ -805,17 +854,109 @@ std::string Worker::CreateDir(const std::string& username, const std::string& pa
     return output;
 }
 
-void Worker::Quit(const std::string& token) {
-    std::string output;
-    pqxx::work work(*_connection);
-    std::cout << "AAAAAAAA" << token << std::endl;
+void Worker::Quit(const std::string& token, const std::string& username) {
+    int user_id = UserID(username);
+
+    // Завершение сессии в PostgreSQL
     try {
-        pqxx::result result = work.exec_prepared("quit", token);
+        pqxx::work work(*_connection);
+        pqxx::result result = work.exec_prepared("quit", user_id);
+        std::string output = GetStringQueryResult(result);
+        work.commit();
+    } catch (const std::exception& e) {
+        NotifyObservers("PostgreSQL error: " + std::string(e.what()));
+    }
+
+    // Удаление из Redis
+    try {
+        std::string auth_key = "auth:" + token;
+        std::string session_key = "session:" + std::to_string(user_id);
+
+        long long deleted_auth = _connectionRedis->del(auth_key);
+        long long deleted_session = _connectionRedis->del(session_key);
+
+        if (deleted_auth > 0)
+            std::cout << "Token deleted from Redis: " << auth_key << std::endl;
+        else
+            std::cout << "Token not found in Redis: " << auth_key << std::endl;
+
+        if (deleted_session > 0)
+            std::cout << "Session deleted from Redis: " << session_key << std::endl;
+        else
+            std::cout << "Session not found in Redis: " << session_key << std::endl;
+
+    } catch (const std::exception& e) {
+        NotifyObservers("Redis error: " + std::string(e.what()));
+    }
+}
+
+
+void Worker::SaveActiveSession(int user_id, const std::string& ip) {
+    std::string key = "session:" + std::to_string(user_id);
+
+    std::unordered_map<std::string, std::string> session_data = {
+        {"ip", ip},
+        {"last_active", std::to_string(std::time(nullptr))}
+    };
+
+    _connectionRedis->hmset(key, session_data.begin(), session_data.end());
+
+    _connectionRedis->expire(key, std::chrono::seconds(3600));
+}
+
+void Worker::UpdateActivity(const std::string& username) {
+    int user_id = UserID(username);
+    std::string key = "session:" + std::to_string(user_id);
+
+    try {
+        _connectionRedis->hset(key, "last_active", std::to_string(std::time(nullptr)));
     } catch (const std::exception& e) {
         NotifyObservers("Error: " + std::string(e.what()));
         return;
     }
-    work.commit();
+}
+
+void Worker::PrintActiveSessions() const
+{
+    try {
+        std::cout << "=== Active Sessions ===" << std::endl;
+
+        long long cursor = 0;
+        do {
+            std::vector<std::string> keys;
+
+            cursor = _connectionRedis->scan(cursor, "session:*", 100, std::back_inserter(keys));
+
+            for (const auto& key : keys) {
+                std::unordered_map<std::string, std::string> session_data;
+                _connectionRedis->hgetall(key, std::inserter(session_data, session_data.begin()));
+
+                std::cout << key << std::endl;
+                for (const auto& [field, value] : session_data) {
+                    std::cout << "  " << field << ": " << value << std::endl;
+                }
+                std::cout << std::endl;
+            }
+
+        } while (cursor != 0);
+
+    } catch (const std::exception& e) {
+        std::cerr << "Error while fetching sessions: " << e.what() << std::endl;
+    }
+}
+
+void Worker::LoginEvent(const std::string& username, int id) const
+{
+    QJsonObject payload;
+    payload["user_id"] = id;
+    payload["username"] = QString::fromStdString(username);
+    payload["timestamp"] = static_cast<qint64>(std::time(nullptr));
+    payload["event"] = "login";
+
+    QJsonDocument doc(payload);
+    std::string message = doc.toJson(QJsonDocument::Compact).toStdString();
+
+    _connectionRedis->publish("users:activity", message);
 }
 
 std::string Worker::GetRole(const std::string& role) {
@@ -836,6 +977,7 @@ std::string Worker::Login(const std::string& login, const std::string& password)
     if (hashedPassword != passwordAndSalt.first) {
         return "Invalid password";
     }
+    LoginEvent(login, user_id);
     std::string token = CreateSession(user_id);
     return token;
 }
@@ -854,7 +996,7 @@ std::pair<std::string, std::string> Worker::GetSaltAndPassword(const std::string
     pqxx::work work(*_connection);
     try {
         pqxx::result result = work.exec_prepared("get_salt_and_password", login);
-        return GetPairQueryResult(result);  
+        return GetPairQueryResult(result);
     } catch (std::string error) {
         NotifyObservers("Error: " + error);
         return std::make_pair("", "");
@@ -863,18 +1005,50 @@ std::pair<std::string, std::string> Worker::GetSaltAndPassword(const std::string
     return std::make_pair("", "");
 }
 
+std::string Worker::GenerateToken() const {
+    boost::uuids::random_generator gen;
+    boost::uuids::uuid u = gen();
+    return to_string(u);
+}
+
 std::string Worker::CreateSession(const int user_id) {
+
+    std::string token = GenerateToken();
     std::string output;
     pqxx::work work(*_connection);
+
+    if (IsUserActive(user_id)) {
+        return "Session exists";
+    }
+
     try {
         pqxx::result result = work.exec_prepared("create_session", user_id);
-        output = GetStringQueryResult(result);
     } catch (const std::exception& e) {
         NotifyObservers("Error: " + std::string(e.what()));
         return "Error";
     }
+
     work.commit();
-    return output;
+
+    try {
+        _connectionRedis->set("auth:" + token, std::to_string(user_id), std::chrono::seconds(3600));
+    } catch (const std::exception& e) {
+        NotifyObservers("Error: " + std::string(e.what()));
+        return "Error";
+    }
+
+    try {
+        SaveActiveSession(user_id, "127.0.0.0");
+    } catch (const std::exception& e) {
+        NotifyObservers("Error: " + std::string(e.what()));
+        return "Error";
+    }
+    return token;
+}
+
+bool Worker::IsUserActive(int user_id) const {
+    std::string key = "session:" + std::to_string(user_id);
+    return _connectionRedis->exists(key) == 1;
 }
 
 int Worker::UserID(const std::string& login) {

@@ -14,8 +14,8 @@ BEGIN
     SELECT session_token
     INTO user_token
     FROM permission_app.sessions
-    WHERE 
-        user_id = (SELECT user_id FROM permission_app.users WHERE login = username) 
+    WHERE
+        user_id = (SELECT user_id FROM permission_app.users WHERE login = username)
         AND exit_at IS NULL;
 
     RETURN user_token;

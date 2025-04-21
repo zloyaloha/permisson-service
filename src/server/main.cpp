@@ -37,7 +37,7 @@ Config LoadConfig(const QString& fileName) {
 int main() {
     Config conf = LoadConfig("../configs/conf.json");
     try {
-        
+
         boost::asio::io_context io_context;
 
         Server server(io_context, conf);

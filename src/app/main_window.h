@@ -13,12 +13,15 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QStandardItemModel>
+
 #include <QTreeView>
 #include <QMessageBox>
 #include <QCheckBox>
 #include <QFile>
 #include <QCloseEvent>
 #include <QWindow>
+
+#include <sw/redis++/redis++.h>
 
 class JsonTreeHandler {
 public:
@@ -55,6 +58,21 @@ private:
     void AddGroup(const QJsonObject& jsonObject);
 };
 
+class RedisSubscriber : public QObject {
+    Q_OBJECT
+signals:
+    void redisMessageReceived(const QString& username, const QString& event, qint64 timestamp);
+public:
+    RedisSubscriber(std::shared_ptr<sw::redis::Redis> redis, QObject* parent);
+    void Subscribe(const std::string& channel);
+    ~RedisSubscriber();
+private:
+    std::shared_ptr<sw::redis::Redis> _redis;
+    std::unique_ptr<sw::redis::Subscriber> _subscriber;
+    std::thread _workerThread;
+    QObject* _parent;
+    bool _running;
+};
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -86,6 +104,8 @@ class MainWindow : public QMainWindow {
         std::shared_ptr<JsonTreeHandler> _treeHandler;
         std::shared_ptr<JsonUserListHandler> _usersListHandler;
         std::shared_ptr<JsonGroupTreeHandler> _groupsTreeHandler;
+        std::shared_ptr<sw::redis::Redis> _connectionRedis;
+        std::unique_ptr<RedisSubscriber> _redisSubscriber;
         Ui::MainWindow *ui;
         std::string _username;
         std::string _token;

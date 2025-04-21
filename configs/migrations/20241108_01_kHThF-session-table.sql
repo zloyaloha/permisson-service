@@ -4,7 +4,6 @@
 CREATE TABLE IF NOT EXISTs permission_app.sessions (
     session_id SERIAL PRIMARY KEY,
     user_id INT REFERENCES permission_app.users(user_id) ON DELETE CASCADE,
-    session_token TEXT UNIQUE NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     exit_at TIMESTAMP DEFAULT NULL

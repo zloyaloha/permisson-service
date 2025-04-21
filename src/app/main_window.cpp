@@ -1,10 +1,39 @@
 #include "main_window.h"
 
-MainWindow::MainWindow(std::shared_ptr<CommandHandler> commandor, QWidget *parent): 
-    QMainWindow(parent), ui(new Ui::MainWindow), 
+MainWindow::MainWindow(std::shared_ptr<CommandHandler> commandor, QWidget *parent):
+    QMainWindow(parent), ui(new Ui::MainWindow),
     _commandHandler(commandor), _treeHandler(std::make_shared<JsonTreeHandler>()), _usersListHandler(std::make_shared<JsonUserListHandler>()),
     _groupsTreeHandler(std::make_shared<JsonGroupTreeHandler>())
 {
+    std::shared_ptr<sw::redis::Redis> _connectionRedis = std::make_shared<sw::redis::Redis>("tcp://127.0.0.1:6379");
+    _redisSubscriber = std::make_unique<RedisSubscriber>(_connectionRedis, this);
+
+    connect(_redisSubscriber.get(), &RedisSubscriber::redisMessageReceived,
+            this, [this](const QString& user, const QString& event, qint64 timestamp)
+    {
+        QAbstractItemModel* model = ui->usersList->model();
+
+        if (model == nullptr) {
+            qWarning() << "Model not set for the table view";
+            return;
+        }
+
+        int rowCount = model->rowCount();
+        for (int row = 0; row < rowCount; ++row) {
+            QModelIndex index = model->index(row, 0);
+            QString currentUsername = model->data(index).toString();
+
+            if (currentUsername == user) {
+                QModelIndex activeIndex = model->index(row, 2);
+                model->setData(activeIndex, event == "login" ? "Online" : "Ofline");
+                return;
+            }
+        }
+        qWarning() << "User not found: " << user;
+    });
+
+    _redisSubscriber->Subscribe("users:activity");
+
     ui->setupUi(this);
     ui->listTree->setContextMenuPolicy(Qt::CustomContextMenu);
     ui->groupsTree->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -242,7 +271,7 @@ void JsonUserListHandler::AddUser(const QJsonObject& user) {
 
     QString username = nameValue.toString();
     QString role = isAdminValue.toBool() ? "Admin" : "User";
-    QString activeStatus = isActiveValue.toBool() ? "Active" : "Inactive";
+    QString activeStatus = isActiveValue.toBool() ? "Online" : "Ofline";
 
     QStandardItem* usernameItem = new QStandardItem(username);
     QStandardItem* isAdminItem = new QStandardItem(role);
@@ -607,3 +636,55 @@ JsonGroupTreeHandler::~JsonGroupTreeHandler() {
     }
 }
 
+RedisSubscriber::RedisSubscriber(std::shared_ptr<sw::redis::Redis> redis, QObject* parent)
+    : QObject(parent), _redis(std::move(redis)), _running(true)
+{
+    if (!_redis) {
+        qWarning() << "Redis client not initialized correctly!";
+        return;
+    }
+
+    _subscriber = std::make_unique<sw::redis::Subscriber>(_redis->subscriber());
+    if (!_subscriber) {
+        qWarning() << "Failed to create Redis subscriber!";
+        return;
+    }
+}
+
+void RedisSubscriber::Subscribe(const std::string &channel) {
+    _subscriber->subscribe(channel);
+
+    _subscriber->on_message([this](std::string channel, std::string msg) {
+        QByteArray jsonBytes = QByteArray::fromStdString(msg);
+        QJsonParseError error;
+        QJsonDocument doc = QJsonDocument::fromJson(jsonBytes, &error);
+
+        if (error.error != QJsonParseError::NoError || !doc.isObject()) {
+            qWarning() << "Ошибка JSON:" << error.errorString();
+            return;
+        }
+
+        QJsonObject obj = doc.object();
+        QString username = obj["username"].toString();
+        QString event = obj["event"].toString();
+        qint64 timestamp = obj["timestamp"].toVariant().toLongLong();
+
+        emit redisMessageReceived(username, event, timestamp);
+    });
+
+    _workerThread = std::thread([this]() {
+        try {
+            while (_running) {
+                _subscriber->consume();
+            }
+        } catch (const std::exception& e) {
+            qWarning() << "Redis consume error:" << e.what();
+        }
+    });
+}
+
+RedisSubscriber::~RedisSubscriber() {
+    _running = false;
+    if (_workerThread.joinable())
+        _workerThread.join();
+}

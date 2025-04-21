@@ -87,6 +87,7 @@ void HelloWindow::LoginButtonClicked()
         return;
     }
     BaseCommand response(ReadResponse());
+    std::cout << response._msg_data[0] << std::endl;
     if (response._msg_data[0] == "Invalid username") {
         ui->statusbar->showMessage("User with this login isn't exist");
     } else if (response._msg_data[0] == "Invalid password") {

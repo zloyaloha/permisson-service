@@ -4,12 +4,10 @@
 CREATE OR REPLACE FUNCTION permission_app.AddSession(
     id INT
 )
-RETURNS TEXT
+RETURNS BOOLEAN
 LANGUAGE plpgsql
 AS
 $$
-DECLARE
-    new_session_token TEXT;
 BEGIN
 
     IF EXISTS (
@@ -17,21 +15,18 @@ BEGIN
         FROM permission_app.sessions
         WHERE user_id = id AND exit_at IS NULL
     ) THEN
-        RETURN 'Session exists';
+        RETURN FALSE;
     END IF;
 
-    new_session_token := encode(gen_random_bytes(32), 'hex');
 
     INSERT INTO permission_app.sessions (
-        user_id,
-        session_token
+        user_id
     )
     VALUES (
-        id,
-        new_session_token
+        id
     );
 
-    RETURN new_session_token;
+    RETURN TRUE;
 END;
 $$;
 

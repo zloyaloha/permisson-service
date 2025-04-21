@@ -8,6 +8,10 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_CXX_STANDARD 17 -O)
 
 find_package(Boost REQUIRED COMPONENTS system)
+find_package(hiredis REQUIRED)
+
+include_directories(/usr/local/include)
+link_directories(/usr/local/lib)
 
 include_directories()
 
@@ -34,4 +38,4 @@ add_executable(app
 )
 target_sources(app PRIVATE ${WINDOWS_SRC})
 
-target_link_libraries(app Qt5::Widgets)
+target_link_libraries(app Qt5::Widgets hiredis redis++)
