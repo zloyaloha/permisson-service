@@ -11,10 +11,10 @@ find_package(Boost REQUIRED COMPONENTS system thread)
 find_package(PkgConfig REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(Qt5 COMPONENTS Core REQUIRED)
-find_package(hiredis REQUIRED)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(HIREDIS REQUIRED hiredis)
 
-include_directories(/usr/local/include)
-link_directories(/usr/local/lib)
+include_directories(${HIREDIS_INCLUDE_DIRS})
 
 pkg_check_modules(PQXX REQUIRED libpqxx)
 pkg_check_modules(PQ REQUIRED libpq)
@@ -34,4 +34,4 @@ add_executable(server
     ${SERVER_SRC}
 )
 
-target_link_libraries(server ${Boost_LIBRARIES} ${PQXX_LIBRARIES} ${PQ_LIBRARIES} Qt5::Core OpenSSL::SSL OpenSSL::Crypto hiredis redis++)
+target_link_libraries(server ${Boost_LIBRARIES} ${PQXX_LIBRARIES} ${PQ_LIBRARIES} Qt5::Core OpenSSL::SSL OpenSSL::Crypto ${HIREDIS_LIBRARIES} redis++)

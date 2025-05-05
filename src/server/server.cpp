@@ -72,10 +72,11 @@ Worker::Worker(ThreadPool& threadPool, std::shared_ptr<tcp::socket> socket, std:
     : _threadPool(threadPool), _socket(socket), Observable(observers), _config(conf)
 {
     QString PARAM_STRING = "host=" + conf.DB_HOST +
-        " port=" + conf.DB_PORT +
-        " dbname=" + conf.DB_NAME +
-        " user=" + conf.DB_USER +
-        " password=" + conf.DB_PASSWORD;
+    " port=" + conf.DB_PORT +
+    " dbname=" + conf.DB_NAME +
+    " user=" + conf.DB_USER +
+    " password=" + conf.DB_PASSWORD;
+    std::cout << PARAM_STRING.toStdString() << std::endl;
     _connection = std::make_unique<pqxx::connection>(PARAM_STRING.toStdString());
     _connectionRedis = std::make_unique<sw::redis::Redis>("tcp://127.0.0.1:6379");
     PrepareQueries();
@@ -176,12 +177,9 @@ bool Worker::ValidateRequest(const std::string& username, const std::string& tok
     if (user_id_opt) {
         std::string user_id = *user_id_opt;
         std::cout << "Authorized user_id = " << user_id << std::endl;
-        // Тут можно обновить last_activity в PostgreSQL:
-        // txn.exec_params("UPDATE permission_app.sessions SET last_activity = NOW() WHERE session_token = $1", token);
         return true;
     } else {
         return false;
-        // Токен не найден в Redis — значит истёк или удалён
         std::cerr << "Unauthorized: invalid or expired token" << std::endl;
     }
 }
@@ -202,7 +200,6 @@ std::string Worker::GetToken(const std::string& username) {
 
 void Worker::ProccessOperation(const BaseCommand &command) {
     static std::string result;
-    PrintActiveSessions();
     switch (command._op) {
         case Operation::Registrate:
             NotifyObservers("Registrate " + command._msg_data[0]);
@@ -867,7 +864,6 @@ void Worker::Quit(const std::string& token, const std::string& username) {
         NotifyObservers("PostgreSQL error: " + std::string(e.what()));
     }
 
-    // Удаление из Redis
     try {
         std::string auth_key = "auth:" + token;
         std::string session_key = "session:" + std::to_string(user_id);
@@ -875,16 +871,8 @@ void Worker::Quit(const std::string& token, const std::string& username) {
         long long deleted_auth = _connectionRedis->del(auth_key);
         long long deleted_session = _connectionRedis->del(session_key);
 
-        if (deleted_auth > 0)
-            std::cout << "Token deleted from Redis: " << auth_key << std::endl;
-        else
-            std::cout << "Token not found in Redis: " << auth_key << std::endl;
-
-        if (deleted_session > 0)
-            std::cout << "Session deleted from Redis: " << session_key << std::endl;
-        else
-            std::cout << "Session not found in Redis: " << session_key << std::endl;
-
+        int user_id = UserID(username);
+        QuitEvent(username, user_id);
     } catch (const std::exception& e) {
         NotifyObservers("Redis error: " + std::string(e.what()));
     }
@@ -952,6 +940,20 @@ void Worker::LoginEvent(const std::string& username, int id) const
     payload["username"] = QString::fromStdString(username);
     payload["timestamp"] = static_cast<qint64>(std::time(nullptr));
     payload["event"] = "login";
+
+    QJsonDocument doc(payload);
+    std::string message = doc.toJson(QJsonDocument::Compact).toStdString();
+
+    _connectionRedis->publish("users:activity", message);
+}
+
+void Worker::QuitEvent(const std::string& username, int id) const
+{
+    QJsonObject payload;
+    payload["user_id"] = id;
+    payload["username"] = QString::fromStdString(username);
+    payload["timestamp"] = static_cast<qint64>(std::time(nullptr));
+    payload["event"] = "quit";
 
     QJsonDocument doc(payload);
     std::string message = doc.toJson(QJsonDocument::Compact).toStdString();

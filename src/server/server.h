@@ -125,6 +125,7 @@ class Worker : public std::enable_shared_from_this<Worker>, public Observable {
         void UpdateActivity(const std::string& username);
         void PrintActiveSessions() const;
         void LoginEvent(const std::string& username, int id) const;
+        void QuitEvent(const std::string& username, int id) const;
         std::string CreateBackup(const std::string& filePath);
         std::string RecoverDB(const std::string& filePath);
     private:
